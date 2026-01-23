@@ -1,0 +1,34 @@
+# MinbarLive - Dependencies
+# Versions pinned for reproducibility (tested with Python 3.10-3.12)
+
+# OpenAI API client
+openai==2.14.0
+
+# Load OPENAI_API_KEY from .env
+python-dotenv==1.2.1
+
+# Audio processing
+sounddevice==0.5.3
+scipy==1.16.3
+numpy==2.4.0
+
+# GUI
+screeninfo==0.8.1
+
+# Secure API key storage (OS keychain)
+keyring==25.6.0
+
+# Testing (development only)
+pytest==9.0.2
+
+# Linting (development only)
+ruff==0.11.12
+
+# Creating Exe
+pyinstaller==6.18.0
+pyinstaller-hooks-contrib==2025.11
+
+# Note: tkinter is part of Python standard library
+
+# For looser version constraints (if pinned versions cause issues):
+# pip install openai>=1.0.0 python-dotenv>=1.0.0 sounddevice>=0.4.0 scipy>=1.10.0 numpy>=1.24.0 screeninfo>=0.8.0 pytest>=8.0.0
