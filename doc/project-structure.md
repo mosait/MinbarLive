@@ -31,6 +31,7 @@
 │   └── writer.py            # Async file writing
 │
 ├── translation/             # Translation pipeline
+│   ├── buffering.py         # Processing strategies (chunk-based, semantic)
 │   ├── dictionary.py        # Multi-language dictionary loading, fuzzy search
 │   ├── rag.py               # Embedding-based Quran matching
 │   └── translator.py        # GPT translation with RAG hints

@@ -25,6 +25,12 @@ from utils.context_manager import get_context_manager
 from audio.capture import audio_callback, get_default_input_device, is_silence
 from audio.writer import segment_writer, async_write_audio
 from translation.translator import translate_text
+from translation.buffering import (
+    SemanticBufferingStrategy,
+    ChunkBasedStrategy,
+    ProcessingStrategy,
+    AudioSegment,
+)
 
 
 class AppController:
@@ -36,6 +42,7 @@ class AppController:
         self.threads: list[threading.Thread] = []
         self.translation_queue: queue.Queue[str] = queue.Queue()
         self._running = False
+        self.strategy: ProcessingStrategy | None = None
 
     def _process_audio(self):
         context_mgr = get_context_manager()
@@ -94,24 +101,40 @@ class AppController:
 
                     log(f"AUDIO-PROCESSOR Transcription received", level="DEBUG")
 
-                    # Check if same language (skip summarization if so)
-                    same_language = settings.source_language == settings.target_language
-
-                    # Add to context manager (skip summarization for same-language mode)
-                    context_mgr.add_transcription(
-                        transcription, enable_summarization=not same_language
+                    # Create AudioSegment for strategy processing
+                    segment = AudioSegment(
+                        file_path=file_path,
+                        transcription=transcription,
+                        is_silent=False,
+                        timestamp=time.time(),
                     )
-                    context = "" if same_language else context_mgr.get_context()
 
-                    if same_language:
-                        log(f"AUDIO-PROCESSOR Same-language mode: {file}", level="INFO")
-                    else:
-                        log(
-                            f"AUDIO-PROCESSOR Translation started: {file}", level="INFO"
+                    transcriptions_to_translate = self.strategy.add_segment(segment)
+                    log_transcriptions = []  # To store transcription-translation pairs
+
+                    for (
+                        trans_text
+                    ) in transcriptions_to_translate:  # Renamed for clarity
+
+                        # Check if same language (skip summarization if so)
+                        same_language = (
+                            settings.source_language == settings.target_language
                         )
-                    translation = translate_text(transcription, context)
 
-                    self.translation_queue.put(translation)
+                        # Add to context manager (skip summarization for same-language mode)
+                        context_mgr.add_transcription(
+                            trans_text, enable_summarization=not same_language
+                        )
+                        context = "" if same_language else context_mgr.get_context()
+
+                        if same_language:
+                            log(f"AUDIO-PROCESSOR Same-language mode", level="INFO")
+                        else:
+                            log(f"AUDIO-PROCESSOR Translation started", level="INFO")
+                        translation = translate_text(trans_text, context)
+
+                        self.translation_queue.put(translation)
+                        log_transcriptions.append((trans_text, translation))
 
                     try:
                         os.remove(file_path)
@@ -127,14 +150,40 @@ class AppController:
                         f"AUDIO-PROCESSOR Processing complete in {duration:.2f}s",
                         level="INFO",
                     )
-                    log_transcription_and_translation(
-                        transcription, translation, duration=duration
-                    )
+
+                    # Log all transcription-translation pairs
+                    for trans_text, translation in log_transcriptions:
+                        log_transcription_and_translation(
+                            trans_text, translation, duration=duration
+                        )
 
                 except Exception as e:
                     log(f"AUDIO-PROCESSOR Error for {file}: {e}", level="ERROR")
+                    # Delete file anyway to prevent buildup during network outages
+                    try:
+                        os.remove(file_path)
+                        log(
+                            f"AUDIO-PROCESSOR Deleted {file} after error", level="DEBUG"
+                        )
+                    except Exception:
+                        pass
+                    # Show connection error in subtitles
+                    self.translation_queue.put("[⚠️ Verbindungsfehler]")
 
             time.sleep(0.2)
+
+        if self.strategy is not None:
+            remaining_transcriptions = self.strategy.flush()
+            for transcription_text in remaining_transcriptions:
+                settings = load_settings()
+                same_language = settings.source_language == settings.target_language
+                context_mgr.add_transcription(
+                    transcription_text, enable_summarization=not same_language
+                )
+                context = "" if same_language else context_mgr.get_context()
+                translation = translate_text(transcription_text, context)
+                self.translation_queue.put(translation)
+                log_transcription_and_translation(transcription_text, translation)
 
         log(f"AUDIO-PROCESSOR ended. Total processed: {files_processed}", level="INFO")
 
@@ -171,6 +220,16 @@ class AppController:
         settings = load_settings()
         log(f"Translation model: {settings.translation_model}", level="INFO")
         log(f"Transcription model: {settings.transcription_model}", level="INFO")
+
+        # Initialize processing strategy
+        if settings.processing_strategy == "semantic":
+            self.strategy = SemanticBufferingStrategy()
+            log("Using SEMANTIC buffering strategy", level="INFO")
+        else:
+            self.strategy = ChunkBasedStrategy()
+            log("Using CHUNK-based strategy", level="INFO")
+
+        self.strategy.reset()
 
         # Start context manager (for async summarization)
         context_mgr = get_context_manager()
@@ -225,6 +284,7 @@ class AppController:
             except Exception as e:
                 log(f"Error joining thread {t.name}: {e}", level="DEBUG")
 
+        self.strategy = None
         self._current_device = None
         self._running = False
 

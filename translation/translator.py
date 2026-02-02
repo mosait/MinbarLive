@@ -13,6 +13,7 @@ from __future__ import annotations
 from config import ATHAN_MATCH_THRESHOLD
 from utils.logging import log
 from utils.openai_client import get_client
+from utils.retry import retry_with_backoff
 from utils.settings import (
     load_settings,
     get_target_language_code,
@@ -226,12 +227,20 @@ def translate_text(text: str, context: str = "") -> str:
     try:
         model = _get_translation_model()
         log(f"Using model: {model}", level="DEBUG")
-        resp = get_client().chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+
+        def _call_translation_api():
+            return get_client().chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+
+        resp = retry_with_backoff(
+            _call_translation_api,
+            max_retries=3,
+            operation_name="Translation",
         )
         translation = resp.choices[0].message.content.strip()
         log(f"TRANSLATOR Final output ({target_lang}): {translation}", level="DEBUG")
@@ -239,4 +248,4 @@ def translate_text(text: str, context: str = "") -> str:
 
     except Exception as e:
         log(f"ERROR in translate_text: {e}", level="ERROR")
-        return ""
+        return "[⚠️ Verbindungsfehler]"

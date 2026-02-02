@@ -648,6 +648,56 @@ class AppGUI(tk.Tk):
             style="AdvancedHint.TLabel",
         ).grid(row=1, column=3, sticky="w", padx=(8, 0), pady=4)
 
+        # Processing Strategy row
+        ttk.Label(
+            model_grid, text="Processing Strategy:", style="AdvancedLabel.TLabel"
+        ).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=4)
+
+        # Use Default checkbox for processing strategy
+        self.use_default_strategy_var = tk.BooleanVar(
+            value=self._saved_settings.use_default_processing_strategy
+        )
+        self.use_default_strategy_cb = ttk.Checkbutton(
+            model_grid,
+            text="Use Default",
+            variable=self.use_default_strategy_var,
+            command=self._on_use_default_strategy_change,
+            style="AdvancedCheck.TCheckbutton",
+        )
+        self.use_default_strategy_cb.grid(row=2, column=1, sticky="w", padx=4, pady=4)
+
+        self._strategy_display_names = ["Chunk-based", "Semantic buffering"]
+        self._strategy_ids = ["chunk", "semantic"]
+        self.strategy_var = tk.StringVar()
+        self.strategy_combo = ttk.Combobox(
+            model_grid,
+            textvariable=self.strategy_var,
+            values=self._strategy_display_names,
+            state=(
+                "disabled"
+                if self._saved_settings.use_default_processing_strategy
+                else "readonly"
+            ),
+            width=28,
+        )
+        self.strategy_combo.grid(row=2, column=2, sticky="w", padx=4, pady=4)
+
+        # Restore saved strategy or default
+        saved_strategy = self._saved_settings.processing_strategy
+        if saved_strategy in self._strategy_ids:
+            self.strategy_combo.current(self._strategy_ids.index(saved_strategy))
+        else:
+            self.strategy_combo.current(1)  # Default to semantic
+        self.strategy_combo.bind("<<ComboboxSelected>>", self._on_strategy_change)
+
+        # Hint label (changes based on running state)
+        self.strategy_hint_label = ttk.Label(
+            model_grid,
+            text="(Semantic waits for sentences)",
+            style="AdvancedHint.TLabel",
+        )
+        self.strategy_hint_label.grid(row=2, column=3, sticky="w", padx=(8, 0), pady=4)
+
         # --- Log area only (controls window) ---
         self.log_frame = tk.Frame(self, bg="black")
         self.log_frame.pack(side="top", fill="both", expand=True)
@@ -768,6 +818,12 @@ class AppGUI(tk.Tk):
         )
         self.stop_btn.configure(state="normal")
         self.status_label.configure(text="Running", fg="#28a745")
+        # Disable strategy controls during running
+        self.use_default_strategy_cb.configure(state="disabled")
+        self.strategy_combo.configure(state="disabled")
+        self.strategy_hint_label.configure(
+            text="⚠ Stop program to change", foreground="#ff6b6b"
+        )
         self._start_log_polling()
         log("Started.", level="INFO")
 
@@ -782,6 +838,13 @@ class AppGUI(tk.Tk):
         self.start_btn.configure(state="normal", text="▶ Start", style="Start.TButton")
         self.stop_btn.configure(state="disabled")
         self.status_label.configure(text="Stopped", fg="white")
+        # Re-enable strategy controls
+        self.use_default_strategy_cb.configure(state="normal")
+        if not self._saved_settings.use_default_processing_strategy:
+            self.strategy_combo.configure(state="readonly")
+        self.strategy_hint_label.configure(
+            text="(Semantic waits for sentences)", foreground="gray"
+        )
         self._stop_log_polling()
         log("Stopped.", level="INFO")
 
@@ -1021,6 +1084,31 @@ class AppGUI(tk.Tk):
             self.speed_label.pack_forget()
             self.speed_decrease_btn.pack_forget()
             self.speed_increase_btn.pack_forget()
+
+    def _on_strategy_change(self, event=None):
+        """Handle processing strategy dropdown change."""
+        selection = self.strategy_combo.current()
+        strategy = self._strategy_ids[selection]
+        self._saved_settings.processing_strategy = strategy
+        self._save_current_settings()
+        log(f"Processing strategy changed to: {strategy}", level="INFO")
+
+    def _on_use_default_strategy_change(self):
+        """Handle use default processing strategy checkbox change."""
+        use_default = self.use_default_strategy_var.get()
+        self._saved_settings.use_default_processing_strategy = use_default
+        if use_default:
+            # Reset to default (semantic)
+            self.strategy_combo.current(1)  # semantic
+            self._saved_settings.processing_strategy = "semantic"
+            self.strategy_combo.configure(state="disabled")
+        else:
+            self.strategy_combo.configure(state="readonly")
+        self._save_current_settings()
+        if use_default:
+            log("Use default processing strategy: semantic", level="INFO")
+        else:
+            log("Use default processing strategy: disabled", level="INFO")
 
     def _save_current_settings(self):
         """Save current settings to disk."""

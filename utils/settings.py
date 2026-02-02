@@ -137,6 +137,9 @@ SUBTITLE_MODE_STACK = "stack"  # Stack subtitles, older ones move up (limited co
 SUBTITLE_MODE_STATIC = "static"  # Only show the most recent subtitle
 SUBTITLE_MODES = [SUBTITLE_MODE_CONTINUOUS, SUBTITLE_MODE_STACK, SUBTITLE_MODE_STATIC]
 
+# Processing strategies
+PROCESSING_STRATEGIES = ["chunk", "semantic"]
+
 
 @dataclass
 class Settings:
@@ -156,6 +159,8 @@ class Settings:
     )
     use_default_translation_model: bool = True  # Use default translation model
     use_default_transcription_model: bool = True  # Use default transcription model
+    processing_strategy: str = "semantic"  # "chunk" or "semantic"
+    use_default_processing_strategy: bool = True  # Use default processing strategy
 
 
 def _settings_path() -> Path:
@@ -222,6 +227,10 @@ def load_settings(use_cache: bool = True) -> Settings:
             use_default_transcription_model=data.get(
                 "use_default_transcription_model", True
             ),
+            processing_strategy=data.get("processing_strategy", "semantic"),
+            use_default_processing_strategy=data.get(
+                "use_default_processing_strategy", True
+            ),
         )
         return _cached_settings
     except Exception:
@@ -252,6 +261,8 @@ def save_settings(settings: Settings) -> None:
         "transcription_model": settings.transcription_model,
         "use_default_translation_model": settings.use_default_translation_model,
         "use_default_transcription_model": settings.use_default_transcription_model,
+        "processing_strategy": settings.processing_strategy,
+        "use_default_processing_strategy": settings.use_default_processing_strategy,
     }
     tmp = _settings_path().with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

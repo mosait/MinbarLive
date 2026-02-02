@@ -15,6 +15,19 @@ These settings are configurable from the control panel and saved between session
 | Input Device    | Audio input source selection                  |
 | Subtitle Screen | Monitor for subtitle display                  |
 
+### Advanced Settings
+
+| Setting             | Default            | Description                                         |
+| ------------------- | ------------------ | --------------------------------------------------- |
+| Translation Model   | GPT-4o Mini        | OpenAI model for translation (affects cost/quality) |
+| Transcription Model | GPT-4o Transcribe  | OpenAI model for speech-to-text                     |
+| Processing Strategy | Semantic buffering | How audio segments are grouped before translation   |
+
+**Processing Strategy Options:**
+
+- **Semantic buffering** (default): Waits for complete sentences before translating. Better quality, slight delay.
+- **Chunk-based**: Translates each audio segment immediately. Faster feedback, may cut sentences.
+
 ## Technical Constants (config.py)
 
 Edit `config.py` to adjust:
@@ -24,6 +37,8 @@ Edit `config.py` to adjust:
 | `DURATION`                  | 12s     | Length of each audio segment                  |
 | `OVERLAP`                   | 2s      | Overlap between segments                      |
 | `FS`                        | 16000   | Sample rate                                   |
+| `SEMANTIC_MAX_CHUNKS`       | 3       | Max segments to buffer before forcing flush   |
+| `SEMANTIC_MAX_SECONDS`      | 10      | Max seconds to buffer before forcing flush    |
 | `RAG_MIN_SIMILARITY`        | 0.60    | Minimum cosine similarity for Quran matching  |
 | `RAG_TOP_K`                 | 5       | Max number of Quran candidates per segment    |
 | `ATHAN_MATCH_THRESHOLD`     | 0.75    | Minimum fuzzy match score for Athan detection |

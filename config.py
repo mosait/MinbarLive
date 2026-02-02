@@ -86,6 +86,12 @@ def ensure_directories() -> None:
 RING_CAPACITY = int(2 * DURATION * FS)  # Keep 2x duration in ring buffer
 
 # -------------------------
+# SEMANTIC BUFFER SETTINGS
+# -------------------------
+SEMANTIC_MAX_CHUNKS = 3
+SEMANTIC_MAX_SECONDS = 10
+
+# -------------------------
 # SILENCE DETECTION
 # -------------------------
 SILENCE_THRESHOLD = 0.001

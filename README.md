@@ -18,6 +18,7 @@ This application captures live audio from a microphone, transcribes speech using
 
 - Real-time audio capture with automatic silence detection
 - Multi-language support (15+ source, 35+ target languages)
+- Semantic buffering for complete sentence translation (configurable)
 - RAG-enhanced translation using precomputed Quran verse embeddings
 - Dictionary matching for Athan phrases
 - Three subtitle modes: Continuous scroll, stacking, or static display

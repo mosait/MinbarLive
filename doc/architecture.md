@@ -32,10 +32,30 @@
 
 1. **Audio Capture** records microphone input into a ring buffer
 2. **Transcription** converts audio segments to text via OpenAI API
-3. **Context Manager** receives transcriptions, provides context back to Translation (async)
-4. **Translation** uses RAG + context + GPT to produce the final translation
-5. **Subtitle GUI** displays translations full-screen
-6. **Control GUI** provides settings, logs, and start/stop controls
+3. **Processing Strategy** buffers transcriptions (semantic) or passes through (chunk)
+4. **Context Manager** receives transcriptions, provides context back to Translation (async)
+5. **Translation** uses RAG + context + GPT to produce the final translation
+6. **Subtitle GUI** displays translations full-screen
+7. **Control GUI** provides settings, logs, and start/stop controls
+
+## Processing Strategies
+
+The app supports two strategies for grouping transcriptions before translation:
+
+### Semantic Buffering (Default)
+
+- Waits for complete sentences before translating
+- Triggers flush when: sentence-ending punctuation detected, 3+ segments buffered, or 10s timeout
+- Better translation quality for religious content
+- Slight delay (5-15 seconds) before subtitles appear
+
+### Chunk-based
+
+- Each audio segment is translated immediately
+- Faster subtitle display
+- May split sentences mid-thought, reducing translation quality
+
+> **Recommendation:** Use Semantic Buffering for sermons/lectures where quality matters. Use Chunk-based only if immediate feedback is critical.
 
 ## Adaptive Context Management
 
