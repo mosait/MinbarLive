@@ -65,6 +65,7 @@ TRANSLATIONS_DIR = os.path.join(DATA_DIR, "translations")
 QURAN_TRANSLATIONS_DIR = os.path.join(TRANSLATIONS_DIR, "quran")
 ATHAN_TRANSLATIONS_DIR = os.path.join(TRANSLATIONS_DIR, "athan")
 FOOTER_TRANSLATIONS_PATH = os.path.join(TRANSLATIONS_DIR, "footer_translations.json")
+GUI_TRANSLATIONS_DIR = os.path.join(TRANSLATIONS_DIR, "gui")
 EMBEDDINGS_DIR = os.path.join(DATA_DIR, "embeddings")
 
 # Embeddings path (language-agnostic, based on Arabic text)

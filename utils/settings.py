@@ -141,6 +141,19 @@ SUBTITLE_MODES = [SUBTITLE_MODE_CONTINUOUS, SUBTITLE_MODE_STACK, SUBTITLE_MODE_S
 PROCESSING_STRATEGIES = ["chunk", "semantic"]
 
 
+# Supported GUI languages (code, display_name)
+GUI_LANGUAGES = [
+    ("de", "Deutsch"),
+    ("en", "English"),
+    ("ar", "العربية"),
+    ("bs", "Bosanski"),
+    ("sq", "Shqip"),
+    ("tr", "Türkçe"),
+]
+GUI_LANGUAGE_CODES = [code for code, _ in GUI_LANGUAGES]
+DEFAULT_GUI_LANGUAGE = "de"
+
+
 @dataclass
 class Settings:
     # Note: openai_api_key is stored securely via keyring, not in this dataclass
@@ -161,6 +174,7 @@ class Settings:
     use_default_transcription_model: bool = True  # Use default transcription model
     processing_strategy: str = "semantic"  # "chunk" or "semantic"
     use_default_processing_strategy: bool = True  # Use default processing strategy
+    gui_language: str = DEFAULT_GUI_LANGUAGE  # GUI language (de, en)
 
 
 def _settings_path() -> Path:
@@ -231,6 +245,7 @@ def load_settings(use_cache: bool = True) -> Settings:
             use_default_processing_strategy=data.get(
                 "use_default_processing_strategy", True
             ),
+            gui_language=data.get("gui_language", DEFAULT_GUI_LANGUAGE),
         )
         return _cached_settings
     except Exception:
@@ -263,6 +278,7 @@ def save_settings(settings: Settings) -> None:
         "use_default_transcription_model": settings.use_default_transcription_model,
         "processing_strategy": settings.processing_strategy,
         "use_default_processing_strategy": settings.use_default_processing_strategy,
+        "gui_language": settings.gui_language,
     }
     tmp = _settings_path().with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

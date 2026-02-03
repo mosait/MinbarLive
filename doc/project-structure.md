@@ -24,6 +24,13 @@
 │       │   ├── tr.json              # Turkish
 │       │   ├── sq.json              # Albanian
 │       │   └── bs.json              # Bosnian
+│       ├── gui/                     # GUI interface translations
+│       │   ├── de.json              # German
+│       │   ├── en.json              # English
+│       │   ├── ar.json              # Arabic
+│       │   ├── bs.json              # Bosnian
+│       │   ├── sq.json              # Albanian
+│       │   └── tr.json              # Turkish
 │       └── footer_translations.json # Disclaimer footer in multiple languages
 │
 ├── audio/                   # Audio capture and processing

@@ -10,7 +10,7 @@ import sys
 import sounddevice as sd
 from screeninfo import get_monitors
 
-from config import ICON_PATH, ICON_PATH_PNG
+from config import ICON_PATH, ICON_PATH_PNG, GUI_TRANSLATIONS_DIR
 from gui.subtitle_window import SubtitleWindow
 from utils.logging import log, log_queue
 from version import __version__
@@ -27,6 +27,9 @@ from utils.settings import (
     DEFAULT_TRANSLATION_MODEL,
     TRANSCRIPTION_MODELS,
     DEFAULT_TRANSCRIPTION_MODEL,
+    GUI_LANGUAGES,
+    GUI_LANGUAGE_CODES,
+    DEFAULT_GUI_LANGUAGE,
 )
 from utils.openai_client import has_api_key
 from utils.api_key_manager import (
@@ -34,6 +37,34 @@ from utils.api_key_manager import (
     prompt_for_api_key,
     remove_api_key,
 )
+from utils.json_helpers import load_json
+
+
+def load_gui_translations(language: str) -> dict:
+    """Load GUI translations for the specified language.
+
+    Always merges with English (en.json) as base to ensure all keys exist.
+    This allows using self._t["key"] without fallbacks in code.
+    """
+    # Load English as base (guaranteed complete)
+    en_path = os.path.join(GUI_TRANSLATIONS_DIR, "en.json")
+    try:
+        base = load_json(en_path)
+    except Exception:
+        base = {}
+
+    # If requested language is English or invalid, return base
+    if language == "en" or language not in GUI_LANGUAGE_CODES:
+        return base
+
+    # Load requested language and merge with base
+    path = os.path.join(GUI_TRANSLATIONS_DIR, f"{language}.json")
+    try:
+        translations = load_json(path)
+        # Merge: translations override base
+        return {**base, **translations}
+    except Exception:
+        return base
 
 
 class AppGUI(tk.Tk):
@@ -41,8 +72,26 @@ class AppGUI(tk.Tk):
         super().__init__()
         self.controller = controller
 
-        # --- Cross-platform styling ---
-        # Configure ttk styles for cross-platform button appearance
+        # Load saved settings first (needed for GUI language)
+        self._saved_settings = load_settings()
+
+        # Load GUI translations
+        self._gui_lang = self._saved_settings.gui_language
+        self._t = load_gui_translations(self._gui_lang)
+
+        # Setup all UI components
+        self._setup_styles()
+        self._setup_window()
+        self._create_top_bar()
+        self._create_settings_bar()
+        self._create_language_bar()
+        self._create_advanced_settings()
+        self._create_log_area()
+        self._create_subtitle_window()
+        self._finalize_setup()
+
+    def _setup_styles(self):
+        """Configure ttk styles for cross-platform button appearance."""
         style = ttk.Style()
 
         # Use 'clam' theme for consistent cross-platform coloring (works on all OS)
@@ -118,12 +167,16 @@ class AppGUI(tk.Tk):
             background="white",
             foreground="black",
             arrowcolor="black",
+            selectbackground="white",
+            selectforeground="black",
         )
         style.map(
             "TCombobox",
             fieldbackground=[("readonly", "white"), ("disabled", "#4a4a4a")],
             foreground=[("readonly", "black"), ("disabled", "#888888")],
             background=[("readonly", "white"), ("disabled", "#4a4a4a")],
+            selectbackground=[("readonly", "white"), ("!focus", "white")],
+            selectforeground=[("readonly", "black"), ("!focus", "black")],
         )
 
         # Disabled combobox style - grey background
@@ -188,8 +241,9 @@ class AppGUI(tk.Tk):
             background=[("active", "#1a1a1a")],
             foreground=[("active", "white")],
         )
-        # ----------------------------------------
 
+    def _setup_window(self):
+        """Configure main window properties, icon, and bindings."""
         self._running = False
         self._log_polling = False
         self._height_slider_after_id = None  # For debouncing height slider
@@ -225,13 +279,17 @@ class AppGUI(tk.Tk):
         self.bind("<Escape>", lambda e: self.on_close())
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # --- Top control bar ---
+        # Remove focus from comboboxes when clicking elsewhere (removes blue selection highlight)
+        self.bind("<Button-1>", self._on_click_remove_combobox_focus)
+
+    def _create_top_bar(self):
+        """Create top control bar with start/stop buttons, font controls, and status."""
         top = tk.Frame(self, bg="black")
         top.pack(side="top", fill="x")
 
         self.start_btn = ttk.Button(
             top,
-            text="▶ Start",
+            text=self._t["start"],
             command=self.on_start,
             width=12,
             style="Start.TButton",
@@ -240,7 +298,7 @@ class AppGUI(tk.Tk):
 
         self.stop_btn = ttk.Button(
             top,
-            text="■ Stop",
+            text=self._t["stop"],
             command=self.on_stop,
             width=12,
             state="disabled",
@@ -250,7 +308,7 @@ class AppGUI(tk.Tk):
 
         self.change_key_btn = ttk.Button(
             top,
-            text="Change Key",
+            text=self._t["change_key"],
             command=self.on_change_key,
             width=14,
             style="Action.TButton",
@@ -259,7 +317,7 @@ class AppGUI(tk.Tk):
 
         self.remove_key_btn = ttk.Button(
             top,
-            text="Remove Key",
+            text=self._t["remove_key"],
             command=self.on_remove_key,
             width=14,
             style="Action.TButton",
@@ -267,9 +325,8 @@ class AppGUI(tk.Tk):
         self.remove_key_btn.pack(side="left", padx=8, pady=6)
 
         # Font size controls
-        tk.Label(top, text="  Font:", fg="white", bg="black").pack(
-            side="left", padx=(8, 2)
-        )
+        self.font_label = tk.Label(top, text=self._t["font"], fg="white", bg="black")
+        self.font_label.pack(side="left", padx=(8, 2))
         self.font_increase_btn = ttk.Button(
             top, text="+", command=self._increase_subtitle_font, width=3
         )
@@ -280,9 +337,10 @@ class AppGUI(tk.Tk):
         self.font_decrease_btn.pack(side="left", padx=2, pady=6)
 
         # Window height slider (5% to 100% of screen)
-        tk.Label(top, text="  Height:", fg="white", bg="black").pack(
-            side="left", padx=(8, 2)
+        self.height_label = tk.Label(
+            top, text=self._t["height"], fg="white", bg="black"
         )
+        self.height_label.pack(side="left", padx=(8, 2))
         self.height_slider = tk.Scale(
             top,
             from_=5,
@@ -299,17 +357,42 @@ class AppGUI(tk.Tk):
         self.height_slider.pack(side="left", padx=2, pady=2)
         tk.Label(top, text="%", fg="white", bg="black").pack(side="left")
 
-        self.status_label = tk.Label(top, text="Stopped", fg="white", bg="black")
+        # GUI Language dropdown
+        self._gui_lang_names = [name for _, name in GUI_LANGUAGES]
+        self.gui_lang_var = tk.StringVar()
+        self.gui_lang_combo = ttk.Combobox(
+            top,
+            textvariable=self.gui_lang_var,
+            values=self._gui_lang_names,
+            state="readonly",
+            width=10,
+        )
+        self.gui_lang_combo.pack(side="right", padx=8, pady=6)
+        # Set current language
+        if self._gui_lang in GUI_LANGUAGE_CODES:
+            self.gui_lang_combo.current(GUI_LANGUAGE_CODES.index(self._gui_lang))
+        else:
+            self.gui_lang_combo.current(0)
+        self.gui_lang_combo.bind("<<ComboboxSelected>>", self._on_gui_language_change)
+
+        self.status_label = tk.Label(
+            top, text=self._t["stopped"], fg="white", bg="black"
+        )
         self.status_label.pack(side="right", padx=10)
 
-        # --- Settings bar (screen + input device selection) ---
+    def _create_settings_bar(self):
+        """Create settings bar with screen and input device selection."""
         settings_frame = tk.Frame(self, bg="black")
         settings_frame.pack(side="top", fill="x", pady=(8, 0))
 
         # Screen selection
-        tk.Label(settings_frame, text="Subtitle Screen:", fg="white", bg="black").pack(
-            side="left", padx=(8, 4)
+        self.screen_label = tk.Label(
+            settings_frame,
+            text=self._t["subtitle_screen"],
+            fg="white",
+            bg="black",
         )
+        self.screen_label.pack(side="left", padx=(8, 4))
         self._monitors = get_monitors()
         self._monitor_names = [
             f"{i}: {m.name} ({m.width}x{m.height})"
@@ -325,25 +408,26 @@ class AppGUI(tk.Tk):
         )
         self.screen_combo.pack(side="left", padx=4)
 
-        # Load saved settings
-        self._saved_settings = load_settings()
-
         # Default to saved monitor or second monitor if available
         saved_monitor = self._saved_settings.monitor_index
         if saved_monitor < len(self._monitors):
-            default_screen_idx = saved_monitor
+            self._default_screen_idx = saved_monitor
         else:
-            default_screen_idx = 1 if len(self._monitors) > 1 else 0
-        self.screen_combo.current(default_screen_idx)
+            self._default_screen_idx = 1 if len(self._monitors) > 1 else 0
+        self.screen_combo.current(self._default_screen_idx)
         self.screen_combo.bind("<<ComboboxSelected>>", self._on_screen_change)
 
         # Spacing
         tk.Label(settings_frame, text="   ", bg="black").pack(side="left")
 
         # Input device selection
-        tk.Label(settings_frame, text="Input Device:", fg="white", bg="black").pack(
-            side="left", padx=(8, 4)
+        self.device_label = tk.Label(
+            settings_frame,
+            text=self._t["input_device"],
+            fg="white",
+            bg="black",
         )
+        self.device_label.pack(side="left", padx=(8, 4))
         self._input_devices = self._get_input_devices()
         self._device_names = [f"{idx}: {name}" for idx, name in self._input_devices]
         self.device_var = tk.StringVar()
@@ -367,14 +451,19 @@ class AppGUI(tk.Tk):
         self.device_combo.current(default_device_idx)
         self.device_combo.bind("<<ComboboxSelected>>", self._on_device_change)
 
-        # --- Second settings row (language selection) ---
+    def _create_language_bar(self):
+        """Create language selection bar with source/target languages and subtitle mode."""
         settings_frame2 = tk.Frame(self, bg="black")
         settings_frame2.pack(side="top", fill="x", pady=(4, 0))
 
         # Source language selection (spoken language)
-        tk.Label(settings_frame2, text="Source:", fg="white", bg="black").pack(
-            side="left", padx=(8, 4)
+        self.source_label = tk.Label(
+            settings_frame2,
+            text=self._t["source"],
+            fg="white",
+            bg="black",
         )
+        self.source_label.pack(side="left", padx=(8, 4))
         self._source_lang_names = [name for name, code in SOURCE_LANGUAGES]
         self.source_lang_var = tk.StringVar()
         self.source_lang_combo = ttk.Combobox(
@@ -402,9 +491,13 @@ class AppGUI(tk.Tk):
         ).pack(side="left", padx=(4, 4))
 
         # Target language selection
-        tk.Label(settings_frame2, text="Target:", fg="white", bg="black").pack(
-            side="left", padx=(4, 4)
+        self.target_label = tk.Label(
+            settings_frame2,
+            text=self._t["target"],
+            fg="white",
+            bg="black",
         )
+        self.target_label.pack(side="left", padx=(4, 4))
         self.language_var = tk.StringVar()
         self.language_combo = ttk.Combobox(
             settings_frame2,
@@ -423,23 +516,28 @@ class AppGUI(tk.Tk):
             self.language_combo.current(0)  # Default to first (German)
         self.language_combo.bind("<<ComboboxSelected>>", self._on_language_change)
 
-        tk.Label(
+        self.quran_hint_label = tk.Label(
             settings_frame2,
-            text="(Quran/Athan always Arabic)",
+            text=self._t["quran_athan_hint"],
             fg="gray",
             bg="black",
             font=("Helvetica", 9),
-        ).pack(side="left", padx=(12, 4))
+        )
+        self.quran_hint_label.pack(side="left", padx=(12, 4))
 
         # Subtitle mode dropdown
-        tk.Label(settings_frame2, text="  Subtitles:", fg="white", bg="black").pack(
-            side="left", padx=(12, 4)
+        self.subtitles_label = tk.Label(
+            settings_frame2,
+            text=self._t["subtitles"],
+            fg="white",
+            bg="black",
         )
+        self.subtitles_label.pack(side="left", padx=(12, 4))
         # User-friendly labels for modes (order: continuous, stack, static)
         self._subtitle_mode_labels = {
-            SUBTITLE_MODE_CONTINUOUS: "Continuous (ticker)",
-            SUBTITLE_MODE_STACK: "Stack (scroll up)",
-            SUBTITLE_MODE_STATIC: "Static (latest only)",
+            SUBTITLE_MODE_CONTINUOUS: self._t["subtitle_mode_continuous"],
+            SUBTITLE_MODE_STACK: self._t["subtitle_mode_stack"],
+            SUBTITLE_MODE_STATIC: self._t["subtitle_mode_static"],
         }
         # Use SUBTITLE_MODES to ensure correct order
         self._subtitle_mode_values = [
@@ -473,7 +571,7 @@ class AppGUI(tk.Tk):
 
         # Scroll speed controls (for continuous mode) - next to mode dropdown
         self.speed_label = tk.Label(
-            settings_frame2, text="  Speed:", fg="white", bg="black"
+            settings_frame2, text=self._t["speed"], fg="white", bg="black"
         )
         self.speed_label.pack(side="left", padx=(4, 2))
         self.speed_decrease_btn = ttk.Button(
@@ -491,7 +589,7 @@ class AppGUI(tk.Tk):
         )
         self.transparent_checkbox = tk.Checkbutton(
             settings_frame2,
-            text="Transparent",
+            text=self._t["transparent"],
             variable=self.transparent_var,
             command=self._on_transparent_change,
             fg="white",
@@ -502,7 +600,8 @@ class AppGUI(tk.Tk):
         )
         # Don't pack yet - will be shown/hidden based on mode
 
-        # --- Advanced Settings (collapsible) ---
+    def _create_advanced_settings(self):
+        """Create collapsible advanced settings section with model selection."""
         self._advanced_expanded = False
 
         # Header bar with toggle button
@@ -511,7 +610,7 @@ class AppGUI(tk.Tk):
 
         self.advanced_toggle_btn = ttk.Button(
             advanced_header,
-            text="▶ Advanced Settings",
+            text="▶ " + self._t["advanced_settings"],
             command=self._toggle_advanced_settings,
             style="AdvancedToggle.TButton",
             cursor="hand2",
@@ -523,27 +622,37 @@ class AppGUI(tk.Tk):
         # Don't pack yet - will be shown when expanded
 
         # Model selection inside advanced frame using grid for alignment
-        model_grid = ttk.Frame(self.advanced_frame, style="AdvancedFrame.TFrame")
-        model_grid.pack(side="top", fill="x", pady=8, padx=8)
+        self.model_grid = ttk.Frame(self.advanced_frame, style="AdvancedFrame.TFrame")
+        self.model_grid.pack(side="top", fill="x", pady=8, padx=8)
 
         # Configure grid columns
-        model_grid.columnconfigure(0, weight=0)  # Labels column
-        model_grid.columnconfigure(1, weight=0)  # Checkbox column
-        model_grid.columnconfigure(2, weight=0)  # Combobox column
-        model_grid.columnconfigure(3, weight=1)  # Hint text column
+        self.model_grid.columnconfigure(0, weight=0)  # Labels column
+        self.model_grid.columnconfigure(1, weight=0)  # Checkbox column
+        self.model_grid.columnconfigure(2, weight=0)  # Combobox column
+        self.model_grid.columnconfigure(3, weight=1)  # Hint text column
 
-        # Translation Model row
-        ttk.Label(
-            model_grid, text="Translation Model:", style="AdvancedLabel.TLabel"
-        ).grid(row=0, column=0, sticky="e", padx=(0, 8), pady=4)
+        self._create_translation_model_row()
+        self._create_transcription_model_row()
+        self._create_processing_strategy_row()
+
+    def _create_translation_model_row(self):
+        """Create translation model selection row in advanced settings."""
+        self.translation_model_label = ttk.Label(
+            self.model_grid,
+            text=self._t["translation_model"],
+            style="AdvancedLabel.TLabel",
+        )
+        self.translation_model_label.grid(
+            row=0, column=0, sticky="e", padx=(0, 8), pady=4
+        )
 
         # Use Default checkbox for translation model
         self.use_default_translation_var = tk.BooleanVar(
             value=self._saved_settings.use_default_translation_model
         )
         self.use_default_translation_cb = ttk.Checkbutton(
-            model_grid,
-            text="Use Default",
+            self.model_grid,
+            text=self._t["use_default"],
             variable=self.use_default_translation_var,
             command=self._on_use_default_translation_change,
             style="AdvancedCheck.TCheckbutton",
@@ -556,7 +665,7 @@ class AppGUI(tk.Tk):
         self._model_ids = [model_id for _, model_id in TRANSLATION_MODELS]
         self.model_var = tk.StringVar()
         self.model_combo = ttk.Combobox(
-            model_grid,
+            self.model_grid,
             textvariable=self.model_var,
             values=self._model_display_names,
             state=(
@@ -583,24 +692,33 @@ class AppGUI(tk.Tk):
         self.model_combo.bind("<<ComboboxSelected>>", self._on_model_change)
 
         # Hint text
-        ttk.Label(
-            model_grid,
-            text="(Affects cost and quality)",
+        self.translation_hint_label = ttk.Label(
+            self.model_grid,
+            text=self._t["hint_cost_quality"],
             style="AdvancedHint.TLabel",
-        ).grid(row=0, column=3, sticky="w", padx=(8, 0), pady=4)
+        )
+        self.translation_hint_label.grid(
+            row=0, column=3, sticky="w", padx=(8, 0), pady=4
+        )
 
-        # Transcription Model row
-        ttk.Label(
-            model_grid, text="Transcription Model:", style="AdvancedLabel.TLabel"
-        ).grid(row=1, column=0, sticky="e", padx=(0, 8), pady=4)
+    def _create_transcription_model_row(self):
+        """Create transcription model selection row in advanced settings."""
+        self.transcription_model_label = ttk.Label(
+            self.model_grid,
+            text=self._t["transcription_model"],
+            style="AdvancedLabel.TLabel",
+        )
+        self.transcription_model_label.grid(
+            row=1, column=0, sticky="e", padx=(0, 8), pady=4
+        )
 
         # Use Default checkbox for transcription model
         self.use_default_transcription_var = tk.BooleanVar(
             value=self._saved_settings.use_default_transcription_model
         )
         self.use_default_transcription_cb = ttk.Checkbutton(
-            model_grid,
-            text="Use Default",
+            self.model_grid,
+            text=self._t["use_default"],
             variable=self.use_default_transcription_var,
             command=self._on_use_default_transcription_change,
             style="AdvancedCheck.TCheckbutton",
@@ -613,7 +731,7 @@ class AppGUI(tk.Tk):
         self._transcription_ids = [model_id for _, model_id in TRANSCRIPTION_MODELS]
         self.transcription_var = tk.StringVar()
         self.transcription_combo = ttk.Combobox(
-            model_grid,
+            self.model_grid,
             textvariable=self.transcription_var,
             values=self._transcription_display_names,
             state=(
@@ -642,35 +760,47 @@ class AppGUI(tk.Tk):
             "<<ComboboxSelected>>", self._on_transcription_model_change
         )
 
-        ttk.Label(
-            model_grid,
-            text="(Speech to text)",
+        self.transcription_hint_label = ttk.Label(
+            self.model_grid,
+            text=self._t["hint_speech_to_text"],
             style="AdvancedHint.TLabel",
-        ).grid(row=1, column=3, sticky="w", padx=(8, 0), pady=4)
+        )
+        self.transcription_hint_label.grid(
+            row=1, column=3, sticky="w", padx=(8, 0), pady=4
+        )
 
-        # Processing Strategy row
-        ttk.Label(
-            model_grid, text="Processing Strategy:", style="AdvancedLabel.TLabel"
-        ).grid(row=2, column=0, sticky="e", padx=(0, 8), pady=4)
+    def _create_processing_strategy_row(self):
+        """Create processing strategy selection row in advanced settings."""
+        self.processing_strategy_label = ttk.Label(
+            self.model_grid,
+            text=self._t["processing_strategy"],
+            style="AdvancedLabel.TLabel",
+        )
+        self.processing_strategy_label.grid(
+            row=2, column=0, sticky="e", padx=(0, 8), pady=4
+        )
 
         # Use Default checkbox for processing strategy
         self.use_default_strategy_var = tk.BooleanVar(
             value=self._saved_settings.use_default_processing_strategy
         )
         self.use_default_strategy_cb = ttk.Checkbutton(
-            model_grid,
-            text="Use Default",
+            self.model_grid,
+            text=self._t["use_default"],
             variable=self.use_default_strategy_var,
             command=self._on_use_default_strategy_change,
             style="AdvancedCheck.TCheckbutton",
         )
         self.use_default_strategy_cb.grid(row=2, column=1, sticky="w", padx=4, pady=4)
 
-        self._strategy_display_names = ["Chunk-based", "Semantic buffering"]
+        self._strategy_display_names = [
+            self._t["strategy_chunk"],
+            self._t["strategy_semantic"],
+        ]
         self._strategy_ids = ["chunk", "semantic"]
         self.strategy_var = tk.StringVar()
         self.strategy_combo = ttk.Combobox(
-            model_grid,
+            self.model_grid,
             textvariable=self.strategy_var,
             values=self._strategy_display_names,
             state=(
@@ -692,19 +822,21 @@ class AppGUI(tk.Tk):
 
         # Hint label (changes based on running state)
         self.strategy_hint_label = ttk.Label(
-            model_grid,
-            text="(Semantic waits for sentences)",
+            self.model_grid,
+            text=self._t["hint_semantic_waits"],
             style="AdvancedHint.TLabel",
         )
         self.strategy_hint_label.grid(row=2, column=3, sticky="w", padx=(8, 0), pady=4)
 
-        # --- Log area only (controls window) ---
+    def _create_log_area(self):
+        """Create log display area with scrollbar."""
         self.log_frame = tk.Frame(self, bg="black")
         self.log_frame.pack(side="top", fill="both", expand=True)
 
-        tk.Label(self.log_frame, text="Logs", fg="white", bg="black").pack(
-            anchor="w", padx=8, pady=(8, 0)
+        self.logs_label = tk.Label(
+            self.log_frame, text=self._t["logs"], fg="white", bg="black"
         )
+        self.logs_label.pack(anchor="w", padx=8, pady=(8, 0))
 
         self.log_text = tk.Text(
             self.log_frame, height=30, width=60, bg="#111111", fg="white", wrap="word"
@@ -716,7 +848,8 @@ class AppGUI(tk.Tk):
         scrollbar.pack(side="right", fill="y", pady=8, padx=(0, 8))
         self.log_text.configure(yscrollcommand=scrollbar.set)
 
-        # Separate subtitle window (use selected monitor and saved font size)
+    def _create_subtitle_window(self):
+        """Create the separate subtitle display window."""
         log(
             f"Creating SubtitleWindow with font_size_base={self._saved_settings.font_size_base}, subtitle_mode={self._saved_settings.subtitle_mode}",
             level="INFO",
@@ -724,7 +857,7 @@ class AppGUI(tk.Tk):
         self.subtitle_window = SubtitleWindow(
             self,
             on_close=self.on_close,
-            monitor_index=default_screen_idx,
+            monitor_index=self._default_screen_idx,
             font_size_base=self._saved_settings.font_size_base,
             target_language=self._saved_settings.target_language,
             subtitle_mode=self._saved_settings.subtitle_mode,
@@ -736,6 +869,8 @@ class AppGUI(tk.Tk):
         # Set height slider to saved value
         self.height_slider.set(self._saved_settings.window_height_percent)
 
+    def _finalize_setup(self):
+        """Final initialization: API key check, speed buttons, and auto-start."""
         # Ensure key is set on first run
         self._ensure_api_key_on_startup()
 
@@ -809,44 +944,52 @@ class AppGUI(tk.Tk):
             device_idx = self.get_selected_device_index()
             self.controller.start(input_device=device_idx)
         except Exception as e:
-            messagebox.showerror("Start failed", str(e))
+            messagebox.showerror(self._t["error_start_failed"], str(e))
             return
 
         self._running = True
         self.start_btn.configure(
-            state="disabled", text="● Running", style="Running.TButton"
+            state="disabled",
+            text=self._t["running"],
+            style="Running.TButton",
         )
         self.stop_btn.configure(state="normal")
-        self.status_label.configure(text="Running", fg="#28a745")
+        self.status_label.configure(
+            text=self._t["running"].replace("● ", ""), fg="#28a745"
+        )
         # Disable strategy controls during running
         self.use_default_strategy_cb.configure(state="disabled")
         self.strategy_combo.configure(state="disabled")
         self.strategy_hint_label.configure(
-            text="⚠ Stop program to change", foreground="#ff6b6b"
+            text=self._t["hint_stop_to_change"],
+            foreground="#ff6b6b",
         )
         self._start_log_polling()
-        log("Started.", level="INFO")
+        log(self._t["log_started"], level="INFO")
 
     def on_stop(self):
         try:
             self.controller.stop()
         except Exception as e:
-            messagebox.showerror("Stop failed", str(e))
+            messagebox.showerror(self._t["error_stop_failed"], str(e))
             return
 
         self._running = False
-        self.start_btn.configure(state="normal", text="▶ Start", style="Start.TButton")
+        self.start_btn.configure(
+            state="normal", text=self._t["start"], style="Start.TButton"
+        )
         self.stop_btn.configure(state="disabled")
-        self.status_label.configure(text="Stopped", fg="white")
+        self.status_label.configure(text=self._t["stopped"], fg="white")
         # Re-enable strategy controls
         self.use_default_strategy_cb.configure(state="normal")
         if not self._saved_settings.use_default_processing_strategy:
             self.strategy_combo.configure(state="readonly")
         self.strategy_hint_label.configure(
-            text="(Semantic waits for sentences)", foreground="gray"
+            text=self._t["hint_semantic_waits"],
+            foreground="gray",
         )
         self._stop_log_polling()
-        log("Stopped.", level="INFO")
+        log(self._t["log_stopped"], level="INFO")
 
     def _get_input_devices(self) -> list[tuple[int, str]]:
         """Get list of available input devices."""
@@ -987,10 +1130,10 @@ class AppGUI(tk.Tk):
         """Toggle the advanced settings panel visibility."""
         self._advanced_expanded = not self._advanced_expanded
         if self._advanced_expanded:
-            self.advanced_toggle_btn.configure(text="▼ Advanced Settings")
+            self.advanced_toggle_btn.configure(text="▼ " + self._t["advanced_settings"])
             self.advanced_frame.pack(side="top", fill="x", before=self.log_frame)
         else:
-            self.advanced_toggle_btn.configure(text="▶ Advanced Settings")
+            self.advanced_toggle_btn.configure(text="▶ " + self._t["advanced_settings"])
             self.advanced_frame.pack_forget()
 
     def _on_model_change(self, event=None):
@@ -1116,6 +1259,109 @@ class AppGUI(tk.Tk):
             save_settings(self._saved_settings)
         except Exception as e:
             log(f"Failed to save settings: {e}", level="ERROR")
+
+    def _on_click_remove_combobox_focus(self, event):
+        """Remove focus from comboboxes when clicking elsewhere to clear selection highlight."""
+        # If the clicked widget is not a combobox, move focus to the main window
+        if not isinstance(event.widget, ttk.Combobox):
+            self.focus_set()
+
+    def _on_gui_language_change(self, event=None):
+        """Handle GUI language dropdown change."""
+        selection = self.gui_lang_combo.current()
+        if 0 <= selection < len(GUI_LANGUAGE_CODES):
+            new_lang = GUI_LANGUAGE_CODES[selection]
+            if new_lang != self._gui_lang:
+                self._gui_lang = new_lang
+                self._saved_settings.gui_language = new_lang
+                self._save_current_settings()
+
+                # Reload translations
+                self._t = load_gui_translations(new_lang)
+
+                # Update all UI elements
+                self._update_all_ui_texts()
+
+                # Get display name for log
+                lang_name = self._gui_lang_names[selection]
+                log(
+                    self._t["log_gui_language_changed"].format(language=lang_name),
+                    level="INFO",
+                )
+
+    def _update_all_ui_texts(self):
+        """Update all UI texts with current translations."""
+        # Top bar buttons
+        if not self._running:
+            self.start_btn.configure(text=self._t["start"])
+            self.status_label.configure(text=self._t["stopped"])
+        else:
+            self.start_btn.configure(text=self._t["running"])
+            # Remove bullet for status
+            running_text = self._t["running"].replace("● ", "")
+            self.status_label.configure(text=running_text)
+
+        self.stop_btn.configure(text=self._t["stop"])
+        self.change_key_btn.configure(text=self._t["change_key"])
+        self.remove_key_btn.configure(text=self._t["remove_key"])
+
+        # Labels
+        self.font_label.configure(text=self._t["font"])
+        self.height_label.configure(text=self._t["height"])
+        self.screen_label.configure(text=self._t["subtitle_screen"])
+        self.device_label.configure(text=self._t["input_device"])
+        self.source_label.configure(text=self._t["source"])
+        self.target_label.configure(text=self._t["target"])
+        self.quran_hint_label.configure(text=self._t["quran_athan_hint"])
+        self.subtitles_label.configure(text=self._t["subtitles"])
+        self.speed_label.configure(text=self._t["speed"])
+        self.transparent_checkbox.configure(text=self._t["transparent"])
+        self.logs_label.configure(text=self._t["logs"])
+
+        # Subtitle mode dropdown
+        self._subtitle_mode_labels = {
+            SUBTITLE_MODE_CONTINUOUS: self._t["subtitle_mode_continuous"],
+            SUBTITLE_MODE_STACK: self._t["subtitle_mode_stack"],
+            SUBTITLE_MODE_STATIC: self._t["subtitle_mode_static"],
+        }
+        self._subtitle_mode_display = [
+            self._subtitle_mode_labels[m] for m in self._subtitle_mode_values
+        ]
+        current_mode_idx = self.subtitle_mode_combo.current()
+        self.subtitle_mode_combo.configure(values=self._subtitle_mode_display)
+        self.subtitle_mode_combo.current(current_mode_idx)
+
+        # Advanced settings
+        if self._advanced_expanded:
+            self.advanced_toggle_btn.configure(text="▼ " + self._t["advanced_settings"])
+        else:
+            self.advanced_toggle_btn.configure(text="▶ " + self._t["advanced_settings"])
+
+        self.translation_model_label.configure(text=self._t["translation_model"])
+        self.transcription_model_label.configure(text=self._t["transcription_model"])
+        self.processing_strategy_label.configure(text=self._t["processing_strategy"])
+        self.translation_hint_label.configure(text=self._t["hint_cost_quality"])
+        self.transcription_hint_label.configure(text=self._t["hint_speech_to_text"])
+
+        # Use Default checkboxes
+        self.use_default_translation_cb.configure(text=self._t["use_default"])
+        self.use_default_transcription_cb.configure(text=self._t["use_default"])
+        self.use_default_strategy_cb.configure(text=self._t["use_default"])
+
+        # Strategy dropdown
+        self._strategy_display_names = [
+            self._t["strategy_chunk"],
+            self._t["strategy_semantic"],
+        ]
+        current_strategy_idx = self.strategy_combo.current()
+        self.strategy_combo.configure(values=self._strategy_display_names)
+        self.strategy_combo.current(current_strategy_idx)
+
+        # Strategy hint
+        if self._running:
+            self.strategy_hint_label.configure(text=self._t["hint_stop_to_change"])
+        else:
+            self.strategy_hint_label.configure(text=self._t["hint_semantic_waits"])
 
     def on_close(self):
         # Stop log polling

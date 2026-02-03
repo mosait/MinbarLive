@@ -86,8 +86,24 @@ data/translations/
 │   ├── tr.json    # Turkish
 │   ├── sq.json    # Albanian
 │   └── bs.json    # Bosnian
+├── gui/           # GUI interface translations
+│   ├── de.json    # German
+│   ├── en.json    # English
+│   ├── ar.json    # Arabic
+│   ├── bs.json    # Bosnian
+│   ├── sq.json    # Albanian
+│   └── tr.json    # Turkish
 └── footer_translations.json
 ```
+
+### GUI Translations
+
+The `gui/` folder contains interface translations for all buttons, labels, and messages in the control panel. To add a new GUI language:
+
+1. Copy `data/translations/gui/en.json` as a template
+2. Translate all values (keep the keys unchanged)
+3. Save as `data/translations/gui/{lang_code}.json`
+4. Add the language to `GUI_LANGUAGES` in `utils/settings.py`
 
 ### Adding a new language
 
@@ -95,6 +111,35 @@ data/translations/
    - Use `notebooks/build_quran_dict.py` with the appropriate translation key from quranenc.com
 2. Create `data/translations/athan/{lang_code}.json` for Athan phrases
 3. The system will automatically use these when the target language matches
+
+## Adding a New GUI Language
+
+To add a new interface language:
+
+1. **Create the translation file:**
+   - Copy `data/translations/gui/en.json` as a template
+   - Translate all values (keep the JSON keys unchanged)
+   - Save as `data/translations/gui/{lang_code}.json`
+
+2. **Register the language:**
+   - Open `utils/settings.py`
+   - Add a tuple to `GUI_LANGUAGES`: `("xx", "Language Name")`
+
+Example for adding French:
+
+```python
+GUI_LANGUAGES = [
+    ("de", "Deutsch"),
+    ("en", "English"),
+    ("ar", "العربية"),
+    ("bs", "Bosanski"),
+    ("fr", "Français"),  # ← New language
+    ("sq", "Shqip"),
+    ("tr", "Türkçe"),
+]
+```
+
+That's it! The dropdown will automatically show the new language.
 
 ### footer_translations.json
 

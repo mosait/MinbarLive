@@ -6,6 +6,7 @@ These settings are configurable from the control panel and saved between session
 
 | Setting         | Description                                   |
 | --------------- | --------------------------------------------- |
+| GUI Language    | Interface language (DE, EN, BS, SQ, TR)       |
 | Source Language | Spoken language (Arabic, Turkish, Urdu, etc.) |
 | Target Language | Translation output (35+ languages)            |
 | Subtitle Mode   | Continuous scroll, Stack, or Static display   |
@@ -14,6 +15,21 @@ These settings are configurable from the control panel and saved between session
 | Scroll Speed    | Speed for continuous mode (0.5x - 5x)         |
 | Input Device    | Audio input source selection                  |
 | Subtitle Screen | Monitor for subtitle display                  |
+
+### GUI Languages
+
+The control panel interface is available in 6 languages:
+
+| Code | Language |
+| ---- | -------- |
+| de   | Deutsch  |
+| en   | English  |
+| ar   | العربية  |
+| bs   | Bosanski |
+| sq   | Shqip    |
+| tr   | Türkçe   |
+
+Select your preferred language from the dropdown in the top-right corner. Changes apply immediately without restart.
 
 ### Advanced Settings
 
