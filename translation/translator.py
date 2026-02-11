@@ -18,6 +18,7 @@ from utils.settings import (
     load_settings,
     get_target_language_code,
     DEFAULT_TRANSLATION_MODEL,
+    FALLBACK_TRANSLATION_MODELS,
 )
 from translation.dictionary import fuzzy_match_athan, has_athan_translation
 from translation.rag import match_quran_rag_multi
@@ -62,9 +63,11 @@ def _build_system_prompt(source_lang: str, target_lang: str) -> str:
     - The content is Sunni Islamic.
     - Preserve Islamic terminology (Allah, Umma, Sunnah, Hadith, Iblis, Jinn, Salah, etc.);
     transliterate rather than translate these terms.
-    - Use standard Islamic honorific symbols where appropriate, e.g.:
-      - ﷺ (sallallahu alayhi wa sallam)
-      - ﷻ (jalla jalaluhu)
+    - Use ONLY these two standard Unicode honorific symbols:
+      - ﷺ after mentioning Prophet Muhammad (sallallahu alayhi wa sallam)
+      - ﷻ after mentioning Allah (jalla jalaluhu)
+    - Do NOT use Arabic script for other honorifics (e.g., radiyallahu anhu, rahimahullah, 
+      alayhi salam). Either transliterate or translate them.
     - Handle transcription errors conservatively; correct only if meaning is clearly distorted.
     - Prefer 'Allah' over local equivalents for God.
     - Output ONLY the translation. No comments, no explanations, no markdown.
@@ -220,32 +223,47 @@ def translate_text(text: str, context: str = "") -> str:
         level="DEBUG",
     )
 
-    # --- 3) GPT Translation ---
+    # --- 3) GPT Translation with model fallback ---
     system_prompt = _build_system_prompt(source_lang, target_lang)
     user_prompt = _build_user_prompt(txt, context, quran_hint, source_lang, target_lang)
 
-    try:
-        model = _get_translation_model()
-        log(f"Using model: {model}", level="DEBUG")
+    # Build fallback chain: primary model first, then fallbacks (deduplicated)
+    primary_model = _get_translation_model()
+    models_to_try = [primary_model]
+    for fallback in FALLBACK_TRANSLATION_MODELS:
+        if fallback not in models_to_try:
+            models_to_try.append(fallback)
 
-        def _call_translation_api():
-            return get_client().chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
+    last_error = None
+    for model in models_to_try:
+        try:
+            log(f"Trying model: {model}", level="DEBUG")
+
+            def _call_translation_api():
+                return get_client().chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                )
+
+            resp = retry_with_backoff(
+                _call_translation_api,
+                max_retries=2,  # Fewer retries per model since we have fallbacks
+                operation_name=f"Translation ({model})",
             )
+            translation = resp.choices[0].message.content.strip()
+            log(
+                f"TRANSLATOR Final output ({target_lang}): {translation}", level="DEBUG"
+            )
+            return translation
 
-        resp = retry_with_backoff(
-            _call_translation_api,
-            max_retries=3,
-            operation_name="Translation",
-        )
-        translation = resp.choices[0].message.content.strip()
-        log(f"TRANSLATOR Final output ({target_lang}): {translation}", level="DEBUG")
-        return translation
+        except Exception as e:
+            last_error = e
+            log(f"Model {model} failed: {e}", level="WARNING")
+            continue  # Try next model
 
-    except Exception as e:
-        log(f"ERROR in translate_text: {e}", level="ERROR")
-        return "[⚠️ Verbindungsfehler]"
+    # All models failed
+    log(f"All translation models failed. Last error: {last_error}", level="ERROR")
+    return "[⚠️ Übersetzung nicht verfügbar]"

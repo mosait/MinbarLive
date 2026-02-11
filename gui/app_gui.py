@@ -451,6 +451,21 @@ class AppGUI(tk.Tk):
         self.device_combo.current(default_device_idx)
         self.device_combo.bind("<<ComboboxSelected>>", self._on_device_change)
 
+        # Footer visibility checkbox
+        self.show_footer_var = tk.BooleanVar(value=self._saved_settings.show_footer)
+        self.show_footer_checkbox = tk.Checkbutton(
+            settings_frame,
+            text=self._t.get("show_footer", "Footer"),
+            variable=self.show_footer_var,
+            command=self._on_show_footer_change,
+            fg="white",
+            bg="black",
+            selectcolor="black",
+            activebackground="black",
+            activeforeground="white",
+        )
+        self.show_footer_checkbox.pack(side="left", padx=(12, 4))
+
     def _create_language_bar(self):
         """Create language selection bar with source/target languages and subtitle mode."""
         settings_frame2 = tk.Frame(self, bg="black")
@@ -817,7 +832,7 @@ class AppGUI(tk.Tk):
         if saved_strategy in self._strategy_ids:
             self.strategy_combo.current(self._strategy_ids.index(saved_strategy))
         else:
-            self.strategy_combo.current(1)  # Default to semantic
+            self.strategy_combo.current(0)  # Default to chunk
         self.strategy_combo.bind("<<ComboboxSelected>>", self._on_strategy_change)
 
         # Hint label (changes based on running state)
@@ -864,6 +879,7 @@ class AppGUI(tk.Tk):
             scroll_speed=self._saved_settings.scroll_speed,
             transparent_static=self._saved_settings.transparent_static,
             window_height_percent=self._saved_settings.window_height_percent,
+            show_footer=self._saved_settings.show_footer,
         )
 
         # Set height slider to saved value
@@ -1121,10 +1137,25 @@ class AppGUI(tk.Tk):
         """Handle transparent checkbox change."""
         enabled = self.transparent_var.get()
         self._saved_settings.transparent_static = enabled
+        
+        # Auto-set height to 100% when transparent mode is enabled
+        if enabled:
+            self.height_slider.set(100)
+            self._apply_height_change(100)
+        
         self._save_current_settings()
         if self.subtitle_window and self.subtitle_window.winfo_exists():
             self.subtitle_window.set_transparent_static(enabled)
         log(f"Transparent mode: {'enabled' if enabled else 'disabled'}", level="INFO")
+
+    def _on_show_footer_change(self):
+        """Handle footer visibility checkbox change."""
+        enabled = self.show_footer_var.get()
+        self._saved_settings.show_footer = enabled
+        self._save_current_settings()
+        if self.subtitle_window and self.subtitle_window.winfo_exists():
+            self.subtitle_window.set_show_footer(enabled)
+        log(f"Footer: {'visible' if enabled else 'hidden'}", level="INFO")
 
     def _toggle_advanced_settings(self):
         """Toggle the advanced settings panel visibility."""
@@ -1241,15 +1272,15 @@ class AppGUI(tk.Tk):
         use_default = self.use_default_strategy_var.get()
         self._saved_settings.use_default_processing_strategy = use_default
         if use_default:
-            # Reset to default (semantic)
-            self.strategy_combo.current(1)  # semantic
-            self._saved_settings.processing_strategy = "semantic"
+            # Reset to default (chunk)
+            self.strategy_combo.current(0)  # chunk
+            self._saved_settings.processing_strategy = "chunk"
             self.strategy_combo.configure(state="disabled")
         else:
             self.strategy_combo.configure(state="readonly")
         self._save_current_settings()
         if use_default:
-            log("Use default processing strategy: semantic", level="INFO")
+            log("Use default processing strategy: chunk", level="INFO")
         else:
             log("Use default processing strategy: disabled", level="INFO")
 
@@ -1316,6 +1347,7 @@ class AppGUI(tk.Tk):
         self.subtitles_label.configure(text=self._t["subtitles"])
         self.speed_label.configure(text=self._t["speed"])
         self.transparent_checkbox.configure(text=self._t["transparent"])
+        self.show_footer_checkbox.configure(text=self._t.get("show_footer", "Footer"))
         self.logs_label.configure(text=self._t["logs"])
 
         # Subtitle mode dropdown

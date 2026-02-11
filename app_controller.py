@@ -19,11 +19,17 @@ from utils.settings import (
     load_settings,
     get_source_language_code,
     DEFAULT_TRANSCRIPTION_MODEL,
+    FALLBACK_TRANSCRIPTION_MODELS,
 )
 from utils.history import log_transcription_and_translation
 from utils.context_manager import get_context_manager
-from audio.capture import audio_callback, get_default_input_device, is_silence
-from audio.writer import segment_writer, async_write_audio
+from audio.capture import (
+    audio_callback,
+    get_default_input_device,
+    is_silence,
+    reset_ring_buffer,
+)
+from audio.writer import segment_writer, async_write_audio, clear_write_queue
 from translation.translator import translate_text
 from translation.buffering import (
     SemanticBufferingStrategy,
@@ -74,30 +80,60 @@ class AppController:
                     # Get source language and transcription model from settings
                     settings = load_settings()
                     lang_code = get_source_language_code(settings.source_language)
-                    transcription_model = (
+                    primary_model = (
                         settings.transcription_model or DEFAULT_TRANSCRIPTION_MODEL
                     )
 
+                    # Build fallback chain: primary model first, then fallbacks (deduplicated)
+                    models_to_try = [primary_model]
+                    for fallback in FALLBACK_TRANSCRIPTION_MODELS:
+                        if fallback not in models_to_try:
+                            models_to_try.append(fallback)
+
                     with open(file_path, "rb") as audio_file:
-                        # Pass language hint if configured, otherwise auto-detect
-                        transcribe_kwargs = {
-                            "model": transcription_model,
-                            "file": audio_file,
-                            "response_format": "text",
-                        }
-                        if lang_code:  # None means auto-detect
-                            transcribe_kwargs["language"] = lang_code
+                        audio_bytes = audio_file.read()
 
-                        def _call_transcription_api():
-                            return client.audio.transcriptions.create(
-                                **transcribe_kwargs
+                    transcription = None
+                    last_error = None
+                    for model in models_to_try:
+                        try:
+                            log(f"Trying transcription model: {model}", level="DEBUG")
+                            # Pass language hint if configured, otherwise auto-detect
+                            transcribe_kwargs = {
+                                "model": model,
+                                "file": ("audio.wav", audio_bytes),
+                                "response_format": "text",
+                            }
+                            if lang_code:  # None means auto-detect
+                                transcribe_kwargs["language"] = lang_code
+
+                            def _call_transcription_api():
+                                return client.audio.transcriptions.create(
+                                    **transcribe_kwargs
+                                )
+
+                            transcription = retry_with_backoff(
+                                _call_transcription_api,
+                                max_retries=2,  # Fewer retries since we have fallbacks
+                                operation_name=f"Transcription ({model})",
                             )
+                            break  # Success, exit loop
 
-                        transcription = retry_with_backoff(
-                            _call_transcription_api,
-                            max_retries=3,
-                            operation_name="Transcription",
+                        except Exception as e:
+                            last_error = e
+                            log(
+                                f"Transcription model {model} failed: {e}",
+                                level="WARNING",
+                            )
+                            continue  # Try next model
+
+                    if transcription is None:
+                        log(
+                            f"All transcription models failed. Last error: {last_error}",
+                            level="ERROR",
                         )
+                        os.remove(file_path)
+                        continue  # Skip this audio file
 
                     log(f"AUDIO-PROCESSOR Transcription received", level="DEBUG")
 
@@ -209,6 +245,28 @@ class AppController:
         self.stop_event = threading.Event()
         self._input_stop_event = threading.Event()
         self.threads = []
+
+        # Reset shared audio state to ensure clean start
+        reset_ring_buffer()
+        clear_write_queue()
+
+        # Also clear the translation queue
+        while not self.translation_queue.empty():
+            try:
+                self.translation_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        # Clean up any leftover audio files from previous session
+        try:
+            for f in os.listdir(AUDIO_DIR):
+                if f.endswith(".wav") or f.endswith(".tmp"):
+                    try:
+                        os.remove(os.path.join(AUDIO_DIR, f))
+                    except Exception:
+                        pass
+        except Exception as e:
+            log(f"Error cleaning up audio files: {e}", level="DEBUG")
 
         if input_device is None:
             input_device = get_default_input_device()

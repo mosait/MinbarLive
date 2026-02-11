@@ -41,6 +41,7 @@ class SubtitleWindow(tk.Toplevel):
         scroll_speed: float = 1.0,
         transparent_static: bool = False,
         window_height_percent: int = 100,
+        show_footer: bool = True,
     ):
         super().__init__(master)
         self._on_close = on_close
@@ -53,6 +54,7 @@ class SubtitleWindow(tk.Toplevel):
             transparent_static  # Transparent background for static mode
         )
         self._window_height_percent = max(5, min(100, window_height_percent))
+        self._show_footer = show_footer  # Show/hide footer disclaimer
 
         self.configure(bg="black")
 
@@ -83,10 +85,13 @@ class SubtitleWindow(tk.Toplevel):
             fg="#111111",  # Dark gray instead of black (black is transparent color)
             bg="orange",
         )
-        self.footer.place(relx=0.5, rely=1.0, anchor="s", relwidth=1.0)
+        if self._show_footer:
+            self.footer.place(relx=0.5, rely=1.0, anchor="s", relwidth=1.0)
+        # If show_footer is False, footer is created but not placed (hidden)
 
         # Subtitle management
-        # Each item is (text_id, text_height, outline_ids) where outline_ids may be None
+        # Each item is (text_id, text_height, line_items) where line_items may be None
+        # line_items is a list of (text_id, box_id) tuples for transparent mode
         self.subtitle_stack: list[tuple] = []
         self.max_subtitles = MAX_SUBTITLES
         self.line_spacing = LINE_SPACING
@@ -242,6 +247,18 @@ class SubtitleWindow(tk.Toplevel):
         footer_text = FOOTER_TRANSLATIONS.get(language, DEFAULT_FOOTER)
         self.footer.configure(text=footer_text)
 
+    def set_show_footer(self, enabled: bool):
+        """Show or hide the footer disclaimer."""
+        self._show_footer = enabled
+        if enabled:
+            self.footer.place(relx=0.5, rely=1.0, anchor="s", relwidth=1.0)
+        else:
+            self.footer.place_forget()
+
+    def get_show_footer(self) -> bool:
+        """Get current footer visibility state."""
+        return self._show_footer
+
     def get_font_size_base(self) -> int:
         """Get current font size base value."""
         return self._font_size_base
@@ -372,66 +389,152 @@ class SubtitleWindow(tk.Toplevel):
         """Remove all subtitle items from the canvas."""
         for item in self.subtitle_stack:
             text_id = item[0]
-            outline_ids = item[2] if len(item) > 2 else None
+            line_items = item[2] if len(item) > 2 else None
             self.canvas.delete(text_id)
-            if outline_ids:
-                for oid in outline_ids:
-                    self.canvas.delete(oid)
+            if line_items:
+                for line_text_id, box_id in line_items:
+                    if line_text_id:
+                        self.canvas.delete(line_text_id)
+                    if box_id:
+                        self.canvas.delete(box_id)
         self.subtitle_stack.clear()
 
+    def _wrap_text_to_lines(self, text: str, max_width: int) -> list[str]:
+        """Split text into lines that fit within max_width pixels."""
+        import tkinter.font as tkfont
+
+        font_obj = tkfont.Font(font=self.font)
+        words = text.split()
+        lines = []
+        current_line = []
+
+        for word in words:
+            test_line = " ".join(current_line + [word])
+            if font_obj.measure(test_line) <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                current_line = [word]
+
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        return lines if lines else [text]
+
     def _create_outlined_text(self, x: float, y: float, text: str) -> tuple:
-        """Create text with black outline for visibility on any background."""
-        outline_ids = []
-        outline_offset = 2  # Pixels for outline thickness
+        """Create text with per-line dark background boxes.
 
-        # Create outline by drawing text in black at offset positions
-        for dx in [-outline_offset, 0, outline_offset]:
-            for dy in [-outline_offset, 0, outline_offset]:
-                if dx == 0 and dy == 0:
-                    continue  # Skip center, that's where main text goes
-                oid = self.canvas.create_text(
-                    x + dx,
-                    y + dy,
-                    text=text,
-                    fill="black",
-                    font=self.font,
-                    anchor="s",
-                    justify="center",
-                    width=self.canvas.winfo_width() - 75,
+        Each line gets its own box sized to fit just that line's text,
+        creating a cleaner look without excess black space.
+        """
+        max_width = self.canvas.winfo_width() - 75
+        lines = self._wrap_text_to_lines(text, max_width)
+
+        padding_x = 20
+        padding_y = 8
+        line_gap = 4  # Small gap between lines
+
+        # Calculate total height needed
+        import tkinter.font as tkfont
+
+        font_obj = tkfont.Font(font=self.font)
+        line_height = font_obj.metrics("linespace")
+
+        # We'll create lines from bottom to top since anchor is "s"
+        # line_items will store (text_id, box_id) for each line
+        line_items = []
+
+        # Start from the bottom y position and work upward
+        current_y = y
+
+        for line_text in reversed(lines):
+            # Create text for this line (no width constraint - single line)
+            text_id = self.canvas.create_text(
+                x,
+                current_y,
+                text=line_text,
+                fill="white",
+                font=self.font,
+                anchor="s",
+                justify="center",
+            )
+
+            # Get actual bbox of this single line
+            bbox = self.canvas.bbox(text_id)
+            if bbox:
+                # Create box sized to this line's actual width
+                box_id = self.canvas.create_rectangle(
+                    bbox[0] - padding_x,
+                    bbox[1] - padding_y,
+                    bbox[2] + padding_x,
+                    bbox[3] + padding_y,
+                    fill="#1a1a1a",
+                    outline="",
                 )
-                outline_ids.append(oid)
+                # Raise text above box
+                self.canvas.tag_raise(text_id, box_id)
+            else:
+                box_id = None
 
-        # Create main white text on top
-        text_id = self.canvas.create_text(
-            x,
-            y,
-            text=text,
-            fill="white",
-            font=self.font,
-            anchor="s",
-            justify="center",
-            width=self.canvas.winfo_width() - 75,
-        )
+            line_items.append((text_id, box_id))
 
-        return text_id, outline_ids
+            # Move up for the next line
+            current_y -= line_height + line_gap
+
+        # Reverse so line_items[0] is the top line, line_items[-1] is bottom
+        line_items.reverse()
+
+        # The "main" text_id is the bottom line (for height calculations)
+        main_text_id = line_items[-1][0]
+
+        return main_text_id, line_items
 
     def _refresh_subtitles(self):
         """Update font for all existing subtitles."""
+        padding_x = 20
+        padding_y = 8
+
         for item in self.subtitle_stack:
-            text_id = item[0]
-            outline_ids = item[2] if len(item) > 2 else None
-            self.canvas.itemconfig(text_id, font=self.font)
-            if outline_ids:
-                for oid in outline_ids:
-                    self.canvas.itemconfig(oid, font=self.font)
+            line_items = item[2] if len(item) > 2 else None
+            if line_items:
+                # Update font and box for each line
+                for line_text_id, box_id in line_items:
+                    if line_text_id:
+                        self.canvas.itemconfig(line_text_id, font=self.font)
+                    if box_id:
+                        bbox = self.canvas.bbox(line_text_id)
+                        if bbox:
+                            self.canvas.coords(
+                                box_id,
+                                bbox[0] - padding_x,
+                                bbox[1] - padding_y,
+                                bbox[2] + padding_x,
+                                bbox[3] + padding_y,
+                            )
+            else:
+                # Non-outlined text (normal mode)
+                text_id = item[0]
+                self.canvas.itemconfig(text_id, font=self.font)
+
         # Recalculate heights and reposition
         new_stack = []
         for item in self.subtitle_stack:
             text_id = item[0]
-            outline_ids = item[2] if len(item) > 2 else None
-            bbox = self.canvas.bbox(text_id)
-            text_height = bbox[3] - bbox[1] if bbox else 75
-            new_stack.append((text_id, text_height, outline_ids))
+            line_items = item[2] if len(item) > 2 else None
+            # Calculate total height from all lines
+            if line_items and len(line_items) > 1:
+                # Get bbox spanning all lines
+                top_line_bbox = self.canvas.bbox(line_items[0][0])
+                bottom_line_bbox = self.canvas.bbox(line_items[-1][0])
+                if top_line_bbox and bottom_line_bbox:
+                    text_height = bottom_line_bbox[3] - top_line_bbox[1]
+                else:
+                    text_height = 75
+            else:
+                bbox = self.canvas.bbox(text_id)
+                text_height = bbox[3] - bbox[1] if bbox else 75
+            new_stack.append((text_id, text_height, line_items))
         self.subtitle_stack = new_stack
         self._reposition_subtitles()
 
@@ -552,15 +655,24 @@ class SubtitleWindow(tk.Toplevel):
         )
 
         if use_outline:
-            # Create outlined text: black outline with white fill
-            text_id, outline_ids = self._create_outlined_text(
+            # Create text with per-line background boxes
+            text_id, line_items = self._create_outlined_text(
                 self.canvas_width / 2,
                 self.canvas_height,
                 text=text,
             )
-            bbox = self.canvas.bbox(text_id)
-            text_height = bbox[3] - bbox[1] if bbox else 75
-            self.subtitle_stack.append((text_id, text_height, outline_ids))
+            # Calculate total height from all lines
+            if line_items and len(line_items) > 1:
+                top_bbox = self.canvas.bbox(line_items[0][0])
+                bottom_bbox = self.canvas.bbox(line_items[-1][0])
+                if top_bbox and bottom_bbox:
+                    text_height = bottom_bbox[3] - top_bbox[1]
+                else:
+                    text_height = 75
+            else:
+                bbox = self.canvas.bbox(text_id)
+                text_height = bbox[3] - bbox[1] if bbox else 75
+            self.subtitle_stack.append((text_id, text_height, line_items))
         else:
             # Create normal text
             text_id = self.canvas.create_text(
@@ -582,11 +694,14 @@ class SubtitleWindow(tk.Toplevel):
             if len(self.subtitle_stack) > self.max_subtitles:
                 old_item = self.subtitle_stack.pop(0)
                 old_id = old_item[0]
-                old_outlines = old_item[2] if len(old_item) > 2 else None
+                old_line_items = old_item[2] if len(old_item) > 2 else None
                 self.canvas.delete(old_id)
-                if old_outlines:
-                    for oid in old_outlines:
-                        self.canvas.delete(oid)
+                if old_line_items:
+                    for line_text_id, box_id in old_line_items:
+                        if line_text_id:
+                            self.canvas.delete(line_text_id)
+                        if box_id:
+                            self.canvas.delete(box_id)
 
         # Reposition based on mode
         if self._subtitle_mode == SUBTITLE_MODE_CONTINUOUS:
@@ -650,40 +765,55 @@ class SubtitleWindow(tk.Toplevel):
         if not self.subtitle_stack:
             return
 
+        import tkinter.font as tkfont
+
         current_y = self.canvas_height - self.margin_bottom
+        padding_x = 20
+        padding_y = 8
+        line_gap = 4
 
         for i in range(len(self.subtitle_stack) - 1, -1, -1):
             item = self.subtitle_stack[i]
             text_id = item[0]
             text_height = item[1]
-            outline_ids = item[2] if len(item) > 2 else None
+            line_items = item[2] if len(item) > 2 else None
 
-            self.canvas.coords(text_id, self.canvas_width / 2, current_y)
+            if line_items:
+                # Reposition each line from bottom to top
+                font_obj = tkfont.Font(font=self.font)
+                line_height = font_obj.metrics("linespace")
+                line_y = current_y
 
-            # Also reposition outline text if present
-            if outline_ids:
-                outline_offset = 2
-                for idx, oid in enumerate(outline_ids):
-                    # Calculate offset based on index (same pattern as creation)
-                    offsets = [
-                        (-outline_offset, -outline_offset),
-                        (-outline_offset, 0),
-                        (-outline_offset, outline_offset),
-                        (0, -outline_offset),
-                        (0, outline_offset),
-                        (outline_offset, -outline_offset),
-                        (outline_offset, 0),
-                        (outline_offset, outline_offset),
-                    ]
-                    if idx < len(offsets):
-                        dx, dy = offsets[idx]
-                        self.canvas.coords(
-                            oid, self.canvas_width / 2 + dx, current_y + dy
-                        )
+                for line_text_id, box_id in reversed(line_items):
+                    # Move line text
+                    self.canvas.coords(line_text_id, self.canvas_width / 2, line_y)
 
-            if i == len(self.subtitle_stack) - 1:
-                self.canvas.itemconfig(text_id, fill="white")
+                    # Update box position
+                    if box_id:
+                        bbox = self.canvas.bbox(line_text_id)
+                        if bbox:
+                            self.canvas.coords(
+                                box_id,
+                                bbox[0] - padding_x,
+                                bbox[1] - padding_y,
+                                bbox[2] + padding_x,
+                                bbox[3] + padding_y,
+                            )
+
+                    # Set text color
+                    if i == len(self.subtitle_stack) - 1:
+                        self.canvas.itemconfig(line_text_id, fill="white")
+                    else:
+                        self.canvas.itemconfig(line_text_id, fill="gray85")
+
+                    line_y -= line_height + line_gap
             else:
-                self.canvas.itemconfig(text_id, fill="gray85")
+                # Normal text (non-outlined)
+                self.canvas.coords(text_id, self.canvas_width / 2, current_y)
+
+                if i == len(self.subtitle_stack) - 1:
+                    self.canvas.itemconfig(text_id, fill="white")
+                else:
+                    self.canvas.itemconfig(text_id, fill="gray85")
 
             current_y -= text_height + self.line_spacing

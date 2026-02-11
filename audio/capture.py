@@ -22,6 +22,14 @@ _ring_write_idx = 0
 _ring_lock = threading.Lock()
 
 
+def reset_ring_buffer():
+    """Reset the ring buffer to its initial state. Call before starting a new session."""
+    global _ring, _ring_write_idx
+    with _ring_lock:
+        _ring[:] = 0
+        _ring_write_idx = 0
+
+
 def audio_callback(indata, frames, time_info, status):
     """
     Sounddevice callback that writes incoming audio to the ring buffer.

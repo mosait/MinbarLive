@@ -105,6 +105,14 @@ TRANSLATION_MODELS = [
 # Default model
 DEFAULT_TRANSLATION_MODEL = "gpt-4o-mini"
 
+# Fallback models to try if primary model fails (in order)
+# These use the same OpenAI API, but different models may have different availability
+FALLBACK_TRANSLATION_MODELS = [
+    "gpt-4o-mini",
+    "gpt-3.5-turbo",
+    "gpt-4o",
+]
+
 # Available transcription models (display_name, model_id)
 TRANSCRIPTION_MODELS = [
     ("GPT-4o Mini Transcribe (Faster & Cheaper)", "gpt-4o-mini-transcribe"),
@@ -113,6 +121,13 @@ TRANSCRIPTION_MODELS = [
 
 # Default transcription model
 DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-transcribe"
+
+# Fallback transcription models to try if primary model fails (in order)
+FALLBACK_TRANSCRIPTION_MODELS = [
+    "gpt-4o-transcribe",
+    "gpt-4o-mini-transcribe",
+    "whisper-1",  # Legacy Whisper model as last resort
+]
 
 
 # Helper to get language code from name
@@ -172,9 +187,10 @@ class Settings:
     )
     use_default_translation_model: bool = True  # Use default translation model
     use_default_transcription_model: bool = True  # Use default transcription model
-    processing_strategy: str = "semantic"  # "chunk" or "semantic"
+    processing_strategy: str = "chunk"  # "chunk" or "semantic"
     use_default_processing_strategy: bool = True  # Use default processing strategy
     gui_language: str = DEFAULT_GUI_LANGUAGE  # GUI language (de, en)
+    show_footer: bool = True  # Show footer disclaimer in subtitle window
 
 
 def _settings_path() -> Path:
@@ -241,11 +257,12 @@ def load_settings(use_cache: bool = True) -> Settings:
             use_default_transcription_model=data.get(
                 "use_default_transcription_model", True
             ),
-            processing_strategy=data.get("processing_strategy", "semantic"),
+            processing_strategy=data.get("processing_strategy", "chunk"),
             use_default_processing_strategy=data.get(
                 "use_default_processing_strategy", True
             ),
             gui_language=data.get("gui_language", DEFAULT_GUI_LANGUAGE),
+            show_footer=data.get("show_footer", True),
         )
         return _cached_settings
     except Exception:
@@ -279,6 +296,7 @@ def save_settings(settings: Settings) -> None:
         "processing_strategy": settings.processing_strategy,
         "use_default_processing_strategy": settings.use_default_processing_strategy,
         "gui_language": settings.gui_language,
+        "show_footer": settings.show_footer,
     }
     tmp = _settings_path().with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

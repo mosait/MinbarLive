@@ -22,6 +22,20 @@ from audio.capture import get_ring_segment, is_silence
 write_queue = queue.Queue()
 
 
+def clear_write_queue():
+    """Clear any pending items in the write queue. Call before starting a new session."""
+    cleared = 0
+    while not write_queue.empty():
+        try:
+            write_queue.get_nowait()
+            write_queue.task_done()
+            cleared += 1
+        except queue.Empty:
+            break
+    if cleared > 0:
+        log(f"Cleared {cleared} pending items from write queue", level="DEBUG")
+
+
 def segment_writer(stop_event) -> None:
     """
     Periodically extracts audio segments from the ring buffer and queues them for writing.
