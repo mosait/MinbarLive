@@ -59,6 +59,7 @@ ICON_PATH_PNG = os.path.join(RESOURCE_DIR, "public", "MinbarLive1.png")
 APP_DATA_DIR = str(get_app_data_dir())
 AUDIO_DIR = os.path.join(APP_DATA_DIR, "recordings")
 HISTORY_DIR = os.path.join(APP_DATA_DIR, "history")
+LOGS_DIR = os.path.join(APP_DATA_DIR, "logs")
 
 # Translation data directories (new structure)
 TRANSLATIONS_DIR = os.path.join(DATA_DIR, "translations")
@@ -76,6 +77,7 @@ def ensure_directories() -> None:
     """Create necessary writable directories. Call this at app startup."""
     os.makedirs(AUDIO_DIR, exist_ok=True)
     os.makedirs(HISTORY_DIR, exist_ok=True)
+    os.makedirs(LOGS_DIR, exist_ok=True)
     # In source runs, ensure data/ exists too.
     if not IS_FROZEN:
         os.makedirs(DATA_DIR, exist_ok=True)

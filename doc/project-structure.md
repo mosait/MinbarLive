@@ -86,6 +86,7 @@ Runtime files are written to a per-user app data folder:
 Contents:
 
 - `history/` - Transcript + translation logs
+- `logs/` - Daily application log files (e.g., `2026-02-13.log`)
 - `recordings/` - Temporary WAV segments
 - `settings.json` - Language preferences, font size, monitor index (NOT the API key)
 
