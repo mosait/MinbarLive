@@ -36,5 +36,6 @@
   "error_stop_failed": "Ndalimi dështoi",
   "log_started": "Filloi.",
   "log_stopped": "Ndaloi.",
-  "log_gui_language_changed": "Gjuha e ndërfaqes u ndryshua në: {language}"
+  "log_gui_language_changed": "Gjuha e ndërfaqes u ndryshua në: {language}",
+  "hide_subtitle_on_stop": "Fshih dritaren e titrave kur ndalet"
 }

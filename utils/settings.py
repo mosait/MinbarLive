@@ -191,6 +191,7 @@ class Settings:
     use_default_processing_strategy: bool = True  # Use default processing strategy
     gui_language: str = DEFAULT_GUI_LANGUAGE  # GUI language (de, en)
     show_footer: bool = True  # Show footer disclaimer in subtitle window
+    hide_subtitle_on_stop: bool = False  # Hide subtitle window when stopped
 
 
 def _settings_path() -> Path:
@@ -263,6 +264,7 @@ def load_settings(use_cache: bool = True) -> Settings:
             ),
             gui_language=data.get("gui_language", DEFAULT_GUI_LANGUAGE),
             show_footer=data.get("show_footer", True),
+            hide_subtitle_on_stop=data.get("hide_subtitle_on_stop", False),
         )
         return _cached_settings
     except Exception:
@@ -297,6 +299,7 @@ def save_settings(settings: Settings) -> None:
         "use_default_processing_strategy": settings.use_default_processing_strategy,
         "gui_language": settings.gui_language,
         "show_footer": settings.show_footer,
+        "hide_subtitle_on_stop": settings.hide_subtitle_on_stop,
     }
     tmp = _settings_path().with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

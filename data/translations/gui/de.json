@@ -47,5 +47,6 @@
   "log_translation_model_changed": "Übersetzungsmodell geändert zu: {model}",
   "log_transcription_model_changed": "Transkriptionsmodell geändert zu: {model}",
   "log_strategy_changed": "Verarbeitungsstrategie geändert zu: {strategy}",
-  "log_gui_language_changed": "GUI-Sprache geändert zu: {language}"
+  "log_gui_language_changed": "GUI-Sprache geändert zu: {language}",
+  "hide_subtitle_on_stop": "Untertitelfenster ausblenden wenn gestoppt"
 }

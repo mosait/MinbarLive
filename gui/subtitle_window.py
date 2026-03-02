@@ -399,6 +399,44 @@ class SubtitleWindow(tk.Toplevel):
                         self.canvas.delete(box_id)
         self.subtitle_stack.clear()
 
+    def clear_subtitles(self):
+        """Public method to clear all subtitles from the window."""
+        self._clear_all_subtitles()
+
+    def hide(self):
+        """Make the window fully invisible on screen AND in OBS.
+
+        Uses the Windows DWM color-key transparency so that OBS Window Capture
+        (which uses Windows Graphics Capture) also sees a fully transparent
+        window instead of a frozen last frame.
+        """
+        # 1. Remove all subtitle text from the canvas
+        self._clear_all_subtitles()
+
+        # 2. Hide the footer (orange bar would still be visible)
+        self.footer.place_forget()
+
+        # 3. Set the background color as the transparent color key.
+        #    This makes every black pixel in the window transparent at the
+        #    DWM composition level, which OBS respects.
+        if sys.platform == "win32":
+            self.wm_attributes("-transparentcolor", "black")
+        else:
+            # Fallback for non-Windows: alpha is the best we can do
+            self.attributes("-alpha", 0.0)
+
+    def show(self):
+        """Restore the window to full visibility (reverses hide())."""
+        # 1. Remove the transparent color key so black is rendered normally again
+        if sys.platform == "win32":
+            self.wm_attributes("-transparentcolor", "")
+        else:
+            self.attributes("-alpha", 1.0)
+
+        # 2. Restore footer if the user wants it
+        if self._show_footer:
+            self.footer.place(relx=0.5, rely=1.0, anchor="s", relwidth=1.0)
+
     def _wrap_text_to_lines(self, text: str, max_width: int) -> list[str]:
         """Split text into lines that fit within max_width pixels."""
         import tkinter.font as tkfont

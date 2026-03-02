@@ -36,5 +36,6 @@
   "error_stop_failed": "Durdurma başarısız",
   "log_started": "Başlatıldı.",
   "log_stopped": "Durduruldu.",
-  "log_gui_language_changed": "Arayüz dili değiştirildi: {language}"
+  "log_gui_language_changed": "Arayüz dili değiştirildi: {language}",
+  "hide_subtitle_on_stop": "Durdurulduğunda altyazı penceresini gizle"
 }

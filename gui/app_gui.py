@@ -649,6 +649,7 @@ class AppGUI(tk.Tk):
         self._create_translation_model_row()
         self._create_transcription_model_row()
         self._create_processing_strategy_row()
+        self._create_hide_subtitle_on_stop_row()
 
     def _create_translation_model_row(self):
         """Create translation model selection row in advanced settings."""
@@ -843,6 +844,39 @@ class AppGUI(tk.Tk):
         )
         self.strategy_hint_label.grid(row=2, column=3, sticky="w", padx=(8, 0), pady=4)
 
+    def _create_hide_subtitle_on_stop_row(self):
+        """Create hide subtitle on stop checkbox row in advanced settings."""
+        self.hide_subtitle_on_stop_var = tk.BooleanVar(
+            value=self._saved_settings.hide_subtitle_on_stop
+        )
+        self.hide_subtitle_on_stop_cb = ttk.Checkbutton(
+            self.model_grid,
+            text=self._t.get("hide_subtitle_on_stop", "Hide subtitle window when stopped"),
+            variable=self.hide_subtitle_on_stop_var,
+            command=self._on_hide_subtitle_on_stop_change,
+            style="AdvancedCheck.TCheckbutton",
+        )
+        self.hide_subtitle_on_stop_cb.grid(
+            row=3, column=0, columnspan=4, sticky="w", padx=4, pady=4
+        )
+
+    def _on_hide_subtitle_on_stop_change(self):
+        """Handle hide subtitle on stop checkbox change."""
+        enabled = self.hide_subtitle_on_stop_var.get()
+        self._saved_settings.hide_subtitle_on_stop = enabled
+        self._save_current_settings()
+        log(
+            f"Hide subtitle on stop: {'enabled' if enabled else 'disabled'}",
+            level="INFO",
+        )
+        # If currently stopped and setting was just enabled, hide immediately
+        if enabled and not self._running:
+            self._destroy_subtitle_window()
+        # If setting was just disabled and currently stopped, show immediately
+        elif not enabled and not self._running:
+            if not self.subtitle_window or not self.subtitle_window.winfo_exists():
+                self._create_subtitle_window()
+
     def _create_log_area(self):
         """Create log display area with scrollbar."""
         self.log_frame = tk.Frame(self, bg="black")
@@ -865,6 +899,11 @@ class AppGUI(tk.Tk):
 
     def _create_subtitle_window(self):
         """Create the separate subtitle display window."""
+        # Use current screen combo selection (may differ from init-time default)
+        current_screen_idx = self.screen_combo.current()
+        if current_screen_idx < 0:
+            current_screen_idx = self._default_screen_idx
+
         log(
             f"Creating SubtitleWindow with font_size_base={self._saved_settings.font_size_base}, subtitle_mode={self._saved_settings.subtitle_mode}",
             level="INFO",
@@ -872,7 +911,7 @@ class AppGUI(tk.Tk):
         self.subtitle_window = SubtitleWindow(
             self,
             on_close=self.on_close,
-            monitor_index=self._default_screen_idx,
+            monitor_index=current_screen_idx,
             font_size_base=self._saved_settings.font_size_base,
             target_language=self._saved_settings.target_language,
             subtitle_mode=self._saved_settings.subtitle_mode,
@@ -884,6 +923,15 @@ class AppGUI(tk.Tk):
 
         # Set height slider to saved value
         self.height_slider.set(self._saved_settings.window_height_percent)
+
+    def _destroy_subtitle_window(self):
+        """Destroy the subtitle window so OBS loses the capture target."""
+        try:
+            if self.subtitle_window and self.subtitle_window.winfo_exists():
+                self.subtitle_window.destroy()
+        except Exception:
+            pass
+        self.subtitle_window = None
 
     def _finalize_setup(self):
         """Final initialization: API key check, speed buttons, and auto-start."""
@@ -897,6 +945,11 @@ class AppGUI(tk.Tk):
         # the app will be closing and this won't matter.
         if has_api_key():
             self.after(150, self.on_start)
+        else:
+            # No auto-start → we're in stopped state.
+            # If hide_subtitle_on_stop is enabled, destroy the window now.
+            if self._saved_settings.hide_subtitle_on_stop:
+                self.after(150, self._destroy_subtitle_window)
 
         # Poll for translations always (they only arrive when running)
         self.after(100, self._process_translation_queue)
@@ -983,6 +1036,11 @@ class AppGUI(tk.Tk):
         self._start_log_polling()
         log(self._t["log_started"], level="INFO")
 
+        # Show subtitle window if it was hidden due to hide_subtitle_on_stop
+        if self._saved_settings.hide_subtitle_on_stop:
+            if not self.subtitle_window or not self.subtitle_window.winfo_exists():
+                self._create_subtitle_window()
+
     def on_stop(self):
         try:
             self.controller.stop()
@@ -1006,6 +1064,10 @@ class AppGUI(tk.Tk):
         )
         self._stop_log_polling()
         log(self._t["log_stopped"], level="INFO")
+
+        # Hide subtitle window if setting is enabled (destroy so OBS loses target)
+        if self._saved_settings.hide_subtitle_on_stop:
+            self._destroy_subtitle_window()
 
     def _get_input_devices(self) -> list[tuple[int, str]]:
         """Get list of available input devices."""
@@ -1379,6 +1441,11 @@ class AppGUI(tk.Tk):
         self.use_default_translation_cb.configure(text=self._t["use_default"])
         self.use_default_transcription_cb.configure(text=self._t["use_default"])
         self.use_default_strategy_cb.configure(text=self._t["use_default"])
+
+        # Hide subtitle on stop checkbox
+        self.hide_subtitle_on_stop_cb.configure(
+            text=self._t.get("hide_subtitle_on_stop", "Hide subtitle window when stopped")
+        )
 
         # Strategy dropdown
         self._strategy_display_names = [

@@ -36,5 +36,6 @@
   "error_stop_failed": "Zaustavljanje nije uspjelo",
   "log_started": "Pokrenuto.",
   "log_stopped": "Zaustavljeno.",
-  "log_gui_language_changed": "Jezik sučelja promijenjen na: {language}"
+  "log_gui_language_changed": "Jezik sučelja promijenjen na: {language}",
+  "hide_subtitle_on_stop": "Sakrij prozor titlova kada je zaustavljeno"
 }

@@ -36,5 +36,6 @@
   "error_stop_failed": "فشل الإيقاف",
   "log_started": "بدأ.",
   "log_stopped": "توقف.",
-  "log_gui_language_changed": "تم تغيير لغة الواجهة إلى: {language}"
+  "log_gui_language_changed": "تم تغيير لغة الواجهة إلى: {language}",
+  "hide_subtitle_on_stop": "إخفاء نافذة الترجمة عند التوقف"
 }
