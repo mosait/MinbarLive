@@ -906,7 +906,7 @@ class AppGUI(tk.Tk):
 
         log(
             f"Creating SubtitleWindow with font_size_base={self._saved_settings.font_size_base}, subtitle_mode={self._saved_settings.subtitle_mode}",
-            level="INFO",
+            level="DEBUG",
         )
         self.subtitle_window = SubtitleWindow(
             self,
@@ -919,6 +919,10 @@ class AppGUI(tk.Tk):
             transparent_static=self._saved_settings.transparent_static,
             window_height_percent=self._saved_settings.window_height_percent,
             show_footer=self._saved_settings.show_footer,
+        )
+        log(
+            f"SubtitleWindow created with font_size={self.subtitle_window.get_current_font_size()}, subtitle_mode={self._saved_settings.subtitle_mode}",
+            level="INFO",
         )
 
         # Set height slider to saved value
@@ -1151,7 +1155,7 @@ class AppGUI(tk.Tk):
             self._save_current_settings()
             log(
                 self._t["log_font_size_changed"].format(
-                    size=self._saved_settings.font_size_base
+                    size=self.subtitle_window.get_current_font_size()
                 ),
                 level="INFO",
             )
@@ -1166,7 +1170,7 @@ class AppGUI(tk.Tk):
             self._save_current_settings()
             log(
                 self._t["log_font_size_changed"].format(
-                    size=self._saved_settings.font_size_base
+                    size=self.subtitle_window.get_current_font_size()
                 ),
                 level="INFO",
             )

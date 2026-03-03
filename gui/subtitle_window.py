@@ -222,11 +222,12 @@ class SubtitleWindow(tk.Toplevel):
             self._update_font()
 
     def _update_font(self):
-        """Recalculate font based on canvas width and font size base."""
+        """Recalculate font based on canvas width and font size base (divisor)."""
         font_size = (
             int(self.canvas_width / self._font_size_base) if self.canvas_width else 24
         )
         font_size = max(12, min(font_size, 120))  # Clamp between 12 and 120
+        self._current_font_size = font_size
         self.font = ("Helvetica", font_size)
 
     def increase_font(self):
@@ -260,8 +261,12 @@ class SubtitleWindow(tk.Toplevel):
         return self._show_footer
 
     def get_font_size_base(self) -> int:
-        """Get current font size base value."""
+        """Get current font size base (divisor) value for settings persistence."""
         return self._font_size_base
+
+    def get_current_font_size(self) -> int:
+        """Get the actual rendered font pixel size."""
+        return getattr(self, '_current_font_size', 24)
 
     def increase_scroll_speed(self) -> float:
         """Increase continuous scroll speed."""
