@@ -37,5 +37,6 @@
   "log_started": "Pokrenuto.",
   "log_stopped": "Zaustavljeno.",
   "log_gui_language_changed": "Jezik sučelja promijenjen na: {language}",
+  "log_font_size_changed": "Veličina fonta promijenjena na: {size}",
   "hide_subtitle_on_stop": "Sakrij prozor titlova kada je zaustavljeno"
 }

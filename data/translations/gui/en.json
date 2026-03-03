@@ -48,5 +48,6 @@
   "log_transcription_model_changed": "Transcription model changed to: {model}",
   "log_strategy_changed": "Processing strategy changed to: {strategy}",
   "log_gui_language_changed": "GUI language changed to: {language}",
+  "log_font_size_changed": "Font size changed to: {size}",
   "hide_subtitle_on_stop": "Hide subtitle window when stopped"
 }

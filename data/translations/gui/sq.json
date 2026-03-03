@@ -37,5 +37,6 @@
   "log_started": "Filloi.",
   "log_stopped": "Ndaloi.",
   "log_gui_language_changed": "Gjuha e ndërfaqes u ndryshua në: {language}",
+  "log_font_size_changed": "Madhësia e fontit u ndryshua në: {size}",
   "hide_subtitle_on_stop": "Fshih dritaren e titrave kur ndalet"
 }

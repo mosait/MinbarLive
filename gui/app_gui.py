@@ -1149,6 +1149,12 @@ class AppGUI(tk.Tk):
                 self.subtitle_window.get_font_size_base()
             )
             self._save_current_settings()
+            log(
+                self._t["log_font_size_changed"].format(
+                    size=self._saved_settings.font_size_base
+                ),
+                level="INFO",
+            )
 
     def _decrease_subtitle_font(self):
         """Decrease subtitle font size."""
@@ -1158,6 +1164,12 @@ class AppGUI(tk.Tk):
                 self.subtitle_window.get_font_size_base()
             )
             self._save_current_settings()
+            log(
+                self._t["log_font_size_changed"].format(
+                    size=self._saved_settings.font_size_base
+                ),
+                level="INFO",
+            )
 
     def _on_height_slider_change(self, value):
         """Handle window height slider change with debouncing."""
