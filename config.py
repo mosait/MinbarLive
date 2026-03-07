@@ -112,6 +112,12 @@ RAG_TOP_K = 5
 ATHAN_MATCH_THRESHOLD = 0.75  # Minimum fuzzy match score for Athan detection
 
 # -------------------------
+# FILE RETENTION
+# -------------------------
+LOGS_RETENTION_DAYS = 30
+HISTORY_RETENTION_DAYS = 90
+
+# -------------------------
 # CONTEXT MANAGEMENT
 # -------------------------
 CONTEXT_RECENT_RAW_COUNT = 3  # Number of recent transcriptions to keep raw
