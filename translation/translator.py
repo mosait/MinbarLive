@@ -53,21 +53,17 @@ def _build_system_prompt(source_lang: str, target_lang: str) -> str:
     Important principles:
     - Preserve ALL meanings and religious concepts.
     - Do NOT translate word-for-word unless the structure is natural in {target_lang}.
-    - You MAY adapt rhetorical structure, sentence flow, and repetition so that the translation
-    sounds natural and appropriate for religious speech in {target_lang}.
-    - Arabic rhetorical repetition or parallel phrasing may be stylistically merged
-    if no meaning is lost.
+    - You MAY adapt rhetorical structure, sentence flow, and repetition so that the translation sounds natural and appropriate for religious speech in {target_lang}.
+    - Arabic rhetorical repetition or parallel phrasing may be stylistically merged if no meaning is lost.
     - Use target-language-appropriate religious style and register.
 
     Additional guidelines:
     - The content is Sunni Islamic.
-    - Preserve Islamic terminology (Allah, Umma, Sunnah, Hadith, Iblis, Jinn, Salah, etc.);
-    transliterate rather than translate these terms.
+    - Preserve Islamic terminology (Allah, Umma, Sunnah, Hadith, Iblis, Jinn, Salah, etc.); transliterate rather than translate these terms.
     - Use ONLY these two standard Unicode honorific symbols:
       - ﷺ after mentioning Prophet Muhammad (sallallahu alayhi wa sallam)
       - ﷻ after mentioning Allah (jalla jalaluhu)
-    - Do NOT use Arabic script for other honorifics (e.g., radiyallahu anhu, rahimahullah, 
-      alayhi salam). Either transliterate or translate them.
+    - Do NOT use Arabic script for other honorifics or words (e.g., radiyallahu anhu, rahimahullah).
     - Handle transcription errors conservatively; correct only if meaning is clearly distorted.
     - Prefer 'Allah' over local equivalents for God.
     - Output ONLY the translation. No comments, no explanations, no markdown.
@@ -84,14 +80,13 @@ def _build_user_prompt(
     Your task:
     - Translate ONLY the text in the "Source Text" section into {target_lang}.
     - The primary source language is {source_lang}, but Arabic Quran verses or religious phrases may appear.
+    - Repeat only if it helpts the reader to understand the current sentence and context
     - Use the Context ONLY to resolve unclear references or pronouns; do NOT translate or repeat it.
     - Preserve all meanings and religious content of the source text.
-    - You may adjust sentence structure, flow, and repetition so the translation
-    sounds natural and fluent in {target_lang}.
+    - You may adjust sentence structure, flow, and repetition so the translation sounds natural and fluent in {target_lang}.
     - Do NOT invent additional sentences, Quran verses, or Hadith.
     - Do NOT omit any meaning.
-    - Use a clear, idiomatic, and listener-friendly {target_lang} style
-    appropriate for religious speech.
+    - Use a clear, idiomatic, and listener-friendly {target_lang} style appropriate for religious speech.
     - Preserve religious terminology correctly.
     - Output ONLY the translated {target_lang} text — no explanations, no comments.
     """

@@ -451,21 +451,6 @@ class AppGUI(tk.Tk):
         self.device_combo.current(default_device_idx)
         self.device_combo.bind("<<ComboboxSelected>>", self._on_device_change)
 
-        # Footer visibility checkbox
-        self.show_footer_var = tk.BooleanVar(value=self._saved_settings.show_footer)
-        self.show_footer_checkbox = tk.Checkbutton(
-            settings_frame,
-            text=self._t.get("show_footer", "Footer"),
-            variable=self.show_footer_var,
-            command=self._on_show_footer_change,
-            fg="white",
-            bg="black",
-            selectcolor="black",
-            activebackground="black",
-            activeforeground="white",
-        )
-        self.show_footer_checkbox.pack(side="left", padx=(12, 4))
-
     def _create_language_bar(self):
         """Create language selection bar with source/target languages and subtitle mode."""
         settings_frame2 = tk.Frame(self, bg="black")
@@ -649,6 +634,7 @@ class AppGUI(tk.Tk):
         self._create_translation_model_row()
         self._create_transcription_model_row()
         self._create_processing_strategy_row()
+        self._create_show_footer_row()
         self._create_hide_subtitle_on_stop_row()
 
     def _create_translation_model_row(self):
@@ -851,12 +837,28 @@ class AppGUI(tk.Tk):
         )
         self.hide_subtitle_on_stop_cb = ttk.Checkbutton(
             self.model_grid,
-            text=self._t.get("hide_subtitle_on_stop", "Hide subtitle window when stopped"),
+            text=self._t.get(
+                "hide_subtitle_on_stop", "Hide subtitle window when stopped"
+            ),
             variable=self.hide_subtitle_on_stop_var,
             command=self._on_hide_subtitle_on_stop_change,
             style="AdvancedCheck.TCheckbutton",
         )
         self.hide_subtitle_on_stop_cb.grid(
+            row=4, column=0, columnspan=4, sticky="w", padx=4, pady=(0, 4)
+        )
+
+    def _create_show_footer_row(self):
+        """Create footer visibility checkbox row in advanced settings."""
+        self.show_footer_var = tk.BooleanVar(value=self._saved_settings.show_footer)
+        self.show_footer_checkbox = ttk.Checkbutton(
+            self.model_grid,
+            text=self._t.get("show_footer", "Footer"),
+            variable=self.show_footer_var,
+            command=self._on_show_footer_change,
+            style="AdvancedCheck.TCheckbutton",
+        )
+        self.show_footer_checkbox.grid(
             row=3, column=0, columnspan=4, sticky="w", padx=4, pady=4
         )
 
@@ -1215,12 +1217,12 @@ class AppGUI(tk.Tk):
         """Handle transparent checkbox change."""
         enabled = self.transparent_var.get()
         self._saved_settings.transparent_static = enabled
-        
+
         # Auto-set height to 100% when transparent mode is enabled
         if enabled:
             self.height_slider.set(100)
             self._apply_height_change(100)
-        
+
         self._save_current_settings()
         if self.subtitle_window and self.subtitle_window.winfo_exists():
             self.subtitle_window.set_transparent_static(enabled)
@@ -1460,7 +1462,9 @@ class AppGUI(tk.Tk):
 
         # Hide subtitle on stop checkbox
         self.hide_subtitle_on_stop_cb.configure(
-            text=self._t.get("hide_subtitle_on_stop", "Hide subtitle window when stopped")
+            text=self._t.get(
+                "hide_subtitle_on_stop", "Hide subtitle window when stopped"
+            )
         )
 
         # Strategy dropdown

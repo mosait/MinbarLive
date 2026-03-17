@@ -19,7 +19,7 @@ from utils.app_paths import get_app_data_dir
 # -------------------------
 # Translation mode (different languages)
 DURATION = 12  # Length (in seconds) of each saved segment
-OVERLAP = 2  # Overlap (in seconds) between segments
+OVERLAP = 3  # Overlap (in seconds) between segments
 STEP = DURATION - OVERLAP  # Interval at which a new segment is captured
 
 # Same-language mode (faster feedback, small overlap to prevent gaps)
