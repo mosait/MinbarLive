@@ -17,7 +17,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from utils.logging import log
-from utils.openai_client import get_client
+from utils.openai_client import create_chat_completion
 from utils.settings import load_settings, DEFAULT_TRANSLATION_MODEL
 from config import (
     CONTEXT_RECENT_RAW_COUNT,
@@ -265,10 +265,10 @@ Recent transcriptions:
 Concise summary:"""
 
         try:
-            resp = get_client().chat.completions.create(
+            resp = create_chat_completion(
                 model=_get_translation_model(),
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=100,
+                max_output_tokens=100,
                 temperature=0.3,
             )
             return resp.choices[0].message.content.strip()
@@ -290,10 +290,10 @@ Summary to compress:
 One-sentence summary for hour {hour_num}:"""
 
         try:
-            resp = get_client().chat.completions.create(
+            resp = create_chat_completion(
                 model=_get_translation_model(),
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=40,
+                max_output_tokens=40,
                 temperature=0.2,
             )
             result = resp.choices[0].message.content.strip()

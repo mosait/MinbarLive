@@ -84,22 +84,23 @@ TARGET_LANGUAGES = [
 TARGET_LANGUAGE_NAMES = [name for name, _ in TARGET_LANGUAGES]
 
 # Available translation models (display_name, model_id)
-# Organized by speed/cost: fastest & cheapest first, highest quality last
+# Keep this list focused on practical TEXT translation models.
+# Excludes image/audio/realtime/search/codex variants and legacy deprecated options.
+# Organized by speed/cost: fastest first, highest quality last.
 TRANSLATION_MODELS = [
-    # Fast & Cheap tier (best for real-time)
-    ("GPT-3.5 Turbo (Cheapest)", "gpt-3.5-turbo"),
-    ("GPT-4.1 Nano", "gpt-4.1-nano"),
+    # Real-time tier (low latency)
     ("GPT-4o Mini", "gpt-4o-mini"),
     ("GPT-4.1 Mini", "gpt-4.1-mini"),
     ("GPT-5 Nano", "gpt-5-nano"),
     ("GPT-5 Mini", "gpt-5-mini"),
-    # Quality tier (slower, better quality)
+    # Balanced tier
     ("GPT-4o", "gpt-4o"),
-    ("GPT-4 Turbo", "gpt-4-turbo"),
     ("GPT-4.1", "gpt-4.1"),
     ("GPT-5", "gpt-5"),
     ("GPT-5.1", "gpt-5.1"),
-    ("GPT-5.2 (Highest Quality)", "gpt-5.2"),
+    # Quality tier
+    ("GPT-5.2 (Stable High Quality)", "gpt-5.2"),
+    ("GPT-5.4 (Highest Quality)", "gpt-5.4"),
 ]
 
 # Default model
@@ -108,8 +109,10 @@ DEFAULT_TRANSLATION_MODEL = "gpt-5.2"
 # Fallback models to try if primary model fails (in order)
 # These use the same OpenAI API, but different models may have different availability
 FALLBACK_TRANSLATION_MODELS = [
-    "gpt-5.2" "gpt-4.1",
-    "gpt-4o",
+    "gpt-5.2",
+    "gpt-5.1",
+    "gpt-4.1",
+    "gpt-4o-mini",
 ]
 
 # Available transcription models (display_name, model_id)

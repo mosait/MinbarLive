@@ -89,8 +89,8 @@ class TestContextManager:
         assert stats["hourly_summaries"] == 0
         assert stats["pending_for_summary"] == 2
 
-    @patch("utils.context_manager.get_client")
-    def test_start_stop_lifecycle(self, mock_get_client):
+    @patch("utils.context_manager.create_chat_completion")
+    def test_start_stop_lifecycle(self, mock_create_chat_completion):
         """Start and stop should manage thread lifecycle correctly."""
         mgr = ContextManager()
 
@@ -119,17 +119,17 @@ class TestContextManager:
 class TestContextManagerIntegration:
     """Integration tests that verify summarization (require mocking API)."""
 
-    @patch("utils.context_manager.get_client")
-    def test_rolling_summary_triggered_after_n_segments(self, mock_get_client):
+    @patch("utils.context_manager.create_chat_completion")
+    def test_rolling_summary_triggered_after_n_segments(
+        self, mock_create_chat_completion
+    ):
         """Rolling summary should be triggered after CONTEXT_SUMMARIZE_EVERY_N segments."""
         # Setup mock
         mock_response = MagicMock()
         mock_response.choices = [
             MagicMock(message=MagicMock(content="Summary of topics"))
         ]
-        mock_get_client.return_value.chat.completions.create.return_value = (
-            mock_response
-        )
+        mock_create_chat_completion.return_value = mock_response
 
         mgr = ContextManager()
         mgr.start()

@@ -10,7 +10,7 @@ Real-time translation system for mosque lectures and prayers, supporting multipl
 
 ## Overview
 
-This application captures live audio from a microphone, transcribes speech using OpenAI's GPT-4o-transcribe, and translates it using GPT-4o-mini. Translations are displayed as subtitles on a full-screen GUI.
+This application captures live audio from a microphone, transcribes and translates speech using OpenAI's AI Models. Translations are displayed as subtitles on a full-screen GUI.
 
 > **⚠️ Language Note:** The primary development and testing focus was **Arabic → German**. While the app supports 15+ source languages and 35+ target languages, other language combinations have not been extensively tested. The Quran and Athan dictionaries are available in **German, English, Turkish, Albanian, and Bosnian**. Contributions for additional language support are welcome!
 

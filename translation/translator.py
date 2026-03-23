@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from config import ATHAN_MATCH_THRESHOLD
 from utils.logging import log
-from utils.openai_client import get_client
+from utils.openai_client import create_chat_completion
 from utils.retry import retry_with_backoff
 from utils.settings import (
     load_settings,
@@ -235,7 +235,7 @@ def translate_text(text: str, context: str = "") -> str:
             log(f"Trying model: {model}", level="DEBUG")
 
             def _call_translation_api():
-                return get_client().chat.completions.create(
+                return create_chat_completion(
                     model=model,
                     messages=[
                         {"role": "system", "content": system_prompt},
