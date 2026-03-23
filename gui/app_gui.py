@@ -636,6 +636,7 @@ class AppGUI(tk.Tk):
         self._create_processing_strategy_row()
         self._create_show_footer_row()
         self._create_hide_subtitle_on_stop_row()
+        self._create_adaptive_catchup_row()
 
     def _create_translation_model_row(self):
         """Create translation model selection row in advanced settings."""
@@ -848,6 +849,25 @@ class AppGUI(tk.Tk):
             row=4, column=0, columnspan=4, sticky="w", padx=4, pady=(0, 4)
         )
 
+    def _create_adaptive_catchup_row(self):
+        """Create adaptive subtitle catch-up checkbox row in advanced settings."""
+        self.adaptive_catchup_var = tk.BooleanVar(
+            value=self._saved_settings.adaptive_subtitle_catchup
+        )
+        self.adaptive_catchup_cb = ttk.Checkbutton(
+            self.model_grid,
+            text=self._t.get(
+                "adaptive_subtitle_catchup",
+                "Adaptive subtitle catch-up (stack + continuous)",
+            ),
+            variable=self.adaptive_catchup_var,
+            command=self._on_adaptive_catchup_change,
+            style="AdvancedCheck.TCheckbutton",
+        )
+        self.adaptive_catchup_cb.grid(
+            row=5, column=0, columnspan=4, sticky="w", padx=4, pady=(0, 4)
+        )
+
     def _create_show_footer_row(self):
         """Create footer visibility checkbox row in advanced settings."""
         self.show_footer_var = tk.BooleanVar(value=self._saved_settings.show_footer)
@@ -921,6 +941,7 @@ class AppGUI(tk.Tk):
             transparent_static=self._saved_settings.transparent_static,
             window_height_percent=self._saved_settings.window_height_percent,
             show_footer=self._saved_settings.show_footer,
+            adaptive_catchup=self._saved_settings.adaptive_subtitle_catchup,
         )
         log(
             f"SubtitleWindow created with font_size={self.subtitle_window.get_current_font_size()}, subtitle_mode={self._saved_settings.subtitle_mode}",
@@ -995,13 +1016,54 @@ class AppGUI(tk.Tk):
 
     def _process_translation_queue(self):
         try:
-            while not self.controller.translation_queue.empty():
+            batch_size, next_poll_ms = self._get_translation_drain_policy()
+            processed = 0
+            while (
+                processed < batch_size
+                and not self.controller.translation_queue.empty()
+            ):
                 text = self.controller.translation_queue.get_nowait()
                 if self.subtitle_window and self.subtitle_window.winfo_exists():
                     self.subtitle_window.add_subtitle(text)
+                processed += 1
         except Exception as e:
             log(f"Translation queue processing error: {e}", level="DEBUG")
-        self.after(100, self._process_translation_queue)
+            next_poll_ms = 100
+        self.after(next_poll_ms, self._process_translation_queue)
+
+    def _get_translation_drain_policy(self) -> tuple[int, int]:
+        """Decide how many subtitles to render now and when to poll again."""
+        queue_depth = self.controller.translation_queue.qsize()
+        mode = self._saved_settings.subtitle_mode
+        adaptive = self._saved_settings.adaptive_subtitle_catchup
+
+        # Default behavior: stable, readable cadence.
+        batch_size = 1
+        next_poll_ms = 100
+
+        if not adaptive or mode not in (SUBTITLE_MODE_CONTINUOUS, SUBTITLE_MODE_STACK):
+            return batch_size, next_poll_ms
+
+        # Backlog-aware acceleration in stack/continuous mode (no subtitle drops).
+        if queue_depth >= 20:
+            return 4, 50
+        if queue_depth >= 10:
+            return 3, 65
+        if queue_depth >= 5:
+            return 2, 80
+
+        if (
+            mode == SUBTITLE_MODE_CONTINUOUS
+            and self.subtitle_window
+            and self.subtitle_window.winfo_exists()
+        ):
+            visual_backlog = self.subtitle_window.get_subtitle_backlog_count()
+            if visual_backlog >= 8:
+                return 2, 70
+            if visual_backlog >= 4:
+                return 1, 80
+
+        return batch_size, next_poll_ms
 
     def on_change_key(self, startup: bool = False):
         prompt_for_api_key(root=self, startup=startup, on_close=self.on_close)
@@ -1237,6 +1299,18 @@ class AppGUI(tk.Tk):
             self.subtitle_window.set_show_footer(enabled)
         log(f"Footer: {'visible' if enabled else 'hidden'}", level="INFO")
 
+    def _on_adaptive_catchup_change(self):
+        """Handle adaptive subtitle catch-up checkbox change."""
+        enabled = self.adaptive_catchup_var.get()
+        self._saved_settings.adaptive_subtitle_catchup = enabled
+        self._save_current_settings()
+        if self.subtitle_window and self.subtitle_window.winfo_exists():
+            self.subtitle_window.set_adaptive_catchup(enabled)
+        log(
+            f"Adaptive subtitle catch-up: {'enabled' if enabled else 'disabled'}",
+            level="INFO",
+        )
+
     def _toggle_advanced_settings(self):
         """Toggle the advanced settings panel visibility."""
         self._advanced_expanded = not self._advanced_expanded
@@ -1464,6 +1538,12 @@ class AppGUI(tk.Tk):
         self.hide_subtitle_on_stop_cb.configure(
             text=self._t.get(
                 "hide_subtitle_on_stop", "Hide subtitle window when stopped"
+            )
+        )
+        self.adaptive_catchup_cb.configure(
+            text=self._t.get(
+                "adaptive_subtitle_catchup",
+                "Adaptive subtitle catch-up (stack + continuous)",
             )
         )
 

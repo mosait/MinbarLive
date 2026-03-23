@@ -42,6 +42,7 @@ class SubtitleWindow(tk.Toplevel):
         transparent_static: bool = False,
         window_height_percent: int = 100,
         show_footer: bool = True,
+        adaptive_catchup: bool = False,
     ):
         super().__init__(master)
         self._on_close = on_close
@@ -55,6 +56,8 @@ class SubtitleWindow(tk.Toplevel):
         )
         self._window_height_percent = max(5, min(100, window_height_percent))
         self._show_footer = show_footer  # Show/hide footer disclaimer
+        self._adaptive_catchup = adaptive_catchup
+        self._effective_scroll_speed = scroll_speed
 
         self.configure(bg="black")
 
@@ -271,16 +274,50 @@ class SubtitleWindow(tk.Toplevel):
     def increase_scroll_speed(self) -> float:
         """Increase continuous scroll speed."""
         self._scroll_speed = min(5.0, self._scroll_speed + 0.5)  # Max 5 px/frame
+        self._effective_scroll_speed = max(self._effective_scroll_speed, self._scroll_speed)
         return self._scroll_speed
 
     def decrease_scroll_speed(self) -> float:
         """Decrease continuous scroll speed."""
         self._scroll_speed = max(0.5, self._scroll_speed - 0.5)  # Min 0.5 px/frame
+        self._effective_scroll_speed = min(self._effective_scroll_speed, self._scroll_speed)
         return self._scroll_speed
 
     def get_scroll_speed(self) -> float:
         """Get current scroll speed."""
         return self._scroll_speed
+
+    def set_adaptive_catchup(self, enabled: bool):
+        """Enable or disable adaptive catch-up for subtitle rendering."""
+        self._adaptive_catchup = enabled
+
+    def get_subtitle_backlog_count(self) -> int:
+        """Estimate how many subtitles are waiting below the visible anchor line."""
+        if self._subtitle_mode != SUBTITLE_MODE_CONTINUOUS:
+            return 0
+
+        visible_anchor = self.canvas_height - self.margin_bottom
+        backlog = 0
+        for item in self.subtitle_stack:
+            text_id = item[0]
+            coords = self.canvas.coords(text_id)
+            if coords and coords[1] > visible_anchor:
+                backlog += 1
+        return backlog
+
+    def _current_scroll_speed(self) -> float:
+        """Compute smoothed scroll speed with optional readability-first catch-up."""
+        target_speed = self._scroll_speed
+        if self._adaptive_catchup and self._subtitle_mode == SUBTITLE_MODE_CONTINUOUS:
+            backlog = self.get_subtitle_backlog_count()
+            # Readability-first: accelerate gently and cap at 2x.
+            multiplier = min(2.0, 1.0 + (0.25 * backlog))
+            target_speed = self._scroll_speed * multiplier
+
+        self._effective_scroll_speed = (0.85 * self._effective_scroll_speed) + (
+            0.15 * target_speed
+        )
+        return self._effective_scroll_speed
 
     def set_transparent_static(self, enabled: bool):
         """Enable or disable transparent background for static mode."""
@@ -372,6 +409,7 @@ class SubtitleWindow(tk.Toplevel):
 
         old_mode = self._subtitle_mode
         self._subtitle_mode = mode
+        self._effective_scroll_speed = self._scroll_speed
         # Clear existing subtitles when changing mode
         self._clear_all_subtitles()
 
@@ -777,13 +815,14 @@ class SubtitleWindow(tk.Toplevel):
         if self._subtitle_mode != SUBTITLE_MODE_CONTINUOUS:
             return
 
+        current_speed = self._current_scroll_speed()
         items_to_remove = []
 
         for i, item in enumerate(self.subtitle_stack):
             text_id = item[0]
             text_height = item[1]
             # Move text upward using current scroll speed
-            self.canvas.move(text_id, 0, -self._scroll_speed)
+            self.canvas.move(text_id, 0, -current_speed)
 
             # Check if text is completely off screen (above top)
             coords = self.canvas.coords(text_id)

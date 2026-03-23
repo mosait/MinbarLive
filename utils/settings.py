@@ -194,6 +194,7 @@ class Settings:
     gui_language: str = DEFAULT_GUI_LANGUAGE  # GUI language (de, en)
     show_footer: bool = True  # Show footer disclaimer in subtitle window
     hide_subtitle_on_stop: bool = False  # Hide subtitle window when stopped
+    adaptive_subtitle_catchup: bool = False  # Speed up display when backlog grows
 
 
 def _settings_path() -> Path:
@@ -267,6 +268,7 @@ def load_settings(use_cache: bool = True) -> Settings:
             gui_language=data.get("gui_language", DEFAULT_GUI_LANGUAGE),
             show_footer=data.get("show_footer", True),
             hide_subtitle_on_stop=data.get("hide_subtitle_on_stop", False),
+            adaptive_subtitle_catchup=data.get("adaptive_subtitle_catchup", False),
         )
         return _cached_settings
     except Exception:
@@ -302,6 +304,7 @@ def save_settings(settings: Settings) -> None:
         "gui_language": settings.gui_language,
         "show_footer": settings.show_footer,
         "hide_subtitle_on_stop": settings.hide_subtitle_on_stop,
+        "adaptive_subtitle_catchup": settings.adaptive_subtitle_catchup,
     }
     tmp = _settings_path().with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
