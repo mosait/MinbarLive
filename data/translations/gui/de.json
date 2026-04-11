@@ -49,5 +49,7 @@
   "log_strategy_changed": "Verarbeitungsstrategie geändert zu: {strategy}",
   "log_gui_language_changed": "GUI-Sprache geändert zu: {language}",
   "log_font_size_changed": "Schriftgröße geändert zu: {size}",
-  "hide_subtitle_on_stop": "Untertitelfenster ausblenden wenn gestoppt"
+  "hide_subtitle_on_stop": "Untertitelfenster ausblenden wenn gestoppt",
+  "adaptive_subtitle_catchup": "Adaptives Untertitel-Aufholen (Fortlaufend-Modus)",
+  "auto_cleanup": "Alte Protokolle (30T) & Verlauf (90T) automatisch löschen"
 }

@@ -32,12 +32,14 @@ def main() -> None:
     from app_controller import AppController
     from gui.app_gui import AppGUI
     from utils.cleanup import run_cleanup
+    from utils.settings import load_settings
 
     # Create necessary directories at startup
     ensure_directories()
 
-    # Purge stale log / history files
-    run_cleanup()
+    # Purge stale log / history files (if enabled)
+    if load_settings().auto_cleanup:
+        run_cleanup()
 
     controller = AppController()
     gui = AppGUI(controller)

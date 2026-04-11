@@ -38,5 +38,7 @@
   "log_stopped": "توقف.",
   "log_gui_language_changed": "تم تغيير لغة الواجهة إلى: {language}",
   "log_font_size_changed": "تم تغيير حجم الخط إلى: {size}",
-  "hide_subtitle_on_stop": "إخفاء نافذة الترجمة عند التوقف"
+  "hide_subtitle_on_stop": "إخفاء نافذة الترجمة عند التوقف",
+  "adaptive_subtitle_catchup": "اللحاق التكيّفي بالترجمة (الوضع المستمر)",
+  "auto_cleanup": "حذف السجلات (30ي) والمحفوظات (90ي) القديمة تلقائيًا"
 }

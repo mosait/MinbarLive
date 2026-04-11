@@ -38,5 +38,7 @@
   "log_stopped": "Zaustavljeno.",
   "log_gui_language_changed": "Jezik sučelja promijenjen na: {language}",
   "log_font_size_changed": "Veličina fonta promijenjena na: {size}",
-  "hide_subtitle_on_stop": "Sakrij prozor titlova kada je zaustavljeno"
+  "hide_subtitle_on_stop": "Sakrij prozor titlova kada je zaustavljeno",
+  "adaptive_subtitle_catchup": "Adaptivno sustizanje titlova (kontinuirani mod)",
+  "auto_cleanup": "Automatsko brisanje starih zapisa (30d) i historije (90d)"
 }

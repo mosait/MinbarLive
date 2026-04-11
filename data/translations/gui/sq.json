@@ -38,5 +38,7 @@
   "log_stopped": "Ndaloi.",
   "log_gui_language_changed": "Gjuha e ndërfaqes u ndryshua në: {language}",
   "log_font_size_changed": "Madhësia e fontit u ndryshua në: {size}",
-  "hide_subtitle_on_stop": "Fshih dritaren e titrave kur ndalet"
+  "hide_subtitle_on_stop": "Fshih dritaren e titrave kur ndalet",
+  "adaptive_subtitle_catchup": "Kapje adaptive e titrave (modaliteti i vazhdueshëm)",
+  "auto_cleanup": "Fshi automatikisht regjistrat e vjetra (30d) dhe historikun (90d)"
 }

@@ -49,5 +49,7 @@
   "log_strategy_changed": "Processing strategy changed to: {strategy}",
   "log_gui_language_changed": "GUI language changed to: {language}",
   "log_font_size_changed": "Font size changed to: {size}",
-  "hide_subtitle_on_stop": "Hide subtitle window when stopped"
+  "hide_subtitle_on_stop": "Hide subtitle window when stopped",
+  "adaptive_subtitle_catchup": "Adaptive subtitle catch-up (continuous mode)",
+  "auto_cleanup": "Auto-delete old logs (30d) & history (90d)"
 }

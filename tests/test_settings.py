@@ -38,7 +38,7 @@ class TestSettingsDataclass:
         assert settings.subtitle_mode == SUBTITLE_MODE_CONTINUOUS
         assert settings.scroll_speed == 1.0
         assert settings.transparent_static is False
-        assert settings.adaptive_subtitle_catchup is False
+        assert settings.adaptive_subtitle_catchup is True
         assert settings.translation_model == DEFAULT_TRANSLATION_MODEL
         assert settings.transcription_model == DEFAULT_TRANSCRIPTION_MODEL
 

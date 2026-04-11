@@ -485,10 +485,20 @@ class AppGUI(tk.Tk):
             "<<ComboboxSelected>>", self._on_source_language_change
         )
 
-        # Arrow label
-        tk.Label(
-            settings_frame2, text=" → ", fg="white", bg="black", font=("Helvetica", 12)
-        ).pack(side="left", padx=(4, 4))
+        # Swap button
+        self.swap_lang_btn = tk.Button(
+            settings_frame2,
+            text=" ⇄ ",
+            fg="white",
+            bg="black",
+            activeforeground="white",
+            activebackground="#333",
+            bd=0,
+            font=("Helvetica", 12),
+            cursor="hand2",
+            command=self._on_swap_languages,
+        )
+        self.swap_lang_btn.pack(side="left", padx=(4, 4))
 
         # Target language selection
         self.target_label = tk.Label(
@@ -637,6 +647,7 @@ class AppGUI(tk.Tk):
         self._create_show_footer_row()
         self._create_hide_subtitle_on_stop_row()
         self._create_adaptive_catchup_row()
+        self._create_auto_cleanup_row()
 
     def _create_translation_model_row(self):
         """Create translation model selection row in advanced settings."""
@@ -858,7 +869,7 @@ class AppGUI(tk.Tk):
             self.model_grid,
             text=self._t.get(
                 "adaptive_subtitle_catchup",
-                "Adaptive subtitle catch-up (stack + continuous)",
+                "Adaptive subtitle catch-up (continuous mode)",
             ),
             variable=self.adaptive_catchup_var,
             command=self._on_adaptive_catchup_change,
@@ -866,6 +877,23 @@ class AppGUI(tk.Tk):
         )
         self.adaptive_catchup_cb.grid(
             row=5, column=0, columnspan=4, sticky="w", padx=4, pady=(0, 4)
+        )
+
+    def _create_auto_cleanup_row(self):
+        """Create auto-cleanup checkbox row in advanced settings."""
+        self.auto_cleanup_var = tk.BooleanVar(value=self._saved_settings.auto_cleanup)
+        self.auto_cleanup_cb = ttk.Checkbutton(
+            self.model_grid,
+            text=self._t.get(
+                "auto_cleanup",
+                "Auto-delete old logs (30d) & history (90d)",
+            ),
+            variable=self.auto_cleanup_var,
+            command=self._on_auto_cleanup_change,
+            style="AdvancedCheck.TCheckbutton",
+        )
+        self.auto_cleanup_cb.grid(
+            row=6, column=0, columnspan=4, sticky="w", padx=4, pady=(0, 4)
         )
 
     def _create_show_footer_row(self):
@@ -1019,8 +1047,7 @@ class AppGUI(tk.Tk):
             batch_size, next_poll_ms = self._get_translation_drain_policy()
             processed = 0
             while (
-                processed < batch_size
-                and not self.controller.translation_queue.empty()
+                processed < batch_size and not self.controller.translation_queue.empty()
             ):
                 text = self.controller.translation_queue.get_nowait()
                 if self.subtitle_window and self.subtitle_window.winfo_exists():
@@ -1189,6 +1216,32 @@ class AppGUI(tk.Tk):
             self._save_current_settings()
             log(f"Source language changed to: {language}", level="INFO")
 
+    def _on_swap_languages(self):
+        """Swap source and target languages if both exist in each other's list."""
+        current_source = self._source_lang_names[self.source_lang_combo.current()]
+        current_target = TARGET_LANGUAGE_NAMES[self.language_combo.current()]
+
+        # Check if swap is possible
+        if current_target not in self._source_lang_names:
+            return
+        if current_source not in TARGET_LANGUAGE_NAMES:
+            return
+
+        # Swap
+        self.source_lang_combo.current(self._source_lang_names.index(current_target))
+        self.language_combo.current(TARGET_LANGUAGE_NAMES.index(current_source))
+
+        self._saved_settings.source_language = current_target
+        self._saved_settings.target_language = current_source
+        self._save_current_settings()
+
+        if self.subtitle_window and self.subtitle_window.winfo_exists():
+            self.subtitle_window.set_language(current_source)
+        log(
+            f"Languages swapped: {current_target} → {current_source}",
+            level="INFO",
+        )
+
     def _on_subtitle_mode_change(self, event=None):
         """Handle subtitle mode dropdown change."""
         selection = self.subtitle_mode_combo.current()
@@ -1308,6 +1361,16 @@ class AppGUI(tk.Tk):
             self.subtitle_window.set_adaptive_catchup(enabled)
         log(
             f"Adaptive subtitle catch-up: {'enabled' if enabled else 'disabled'}",
+            level="INFO",
+        )
+
+    def _on_auto_cleanup_change(self):
+        """Handle auto-cleanup checkbox change."""
+        enabled = self.auto_cleanup_var.get()
+        self._saved_settings.auto_cleanup = enabled
+        self._save_current_settings()
+        log(
+            f"Auto-cleanup: {'enabled' if enabled else 'disabled'}",
             level="INFO",
         )
 
@@ -1543,7 +1606,13 @@ class AppGUI(tk.Tk):
         self.adaptive_catchup_cb.configure(
             text=self._t.get(
                 "adaptive_subtitle_catchup",
-                "Adaptive subtitle catch-up (stack + continuous)",
+                "Adaptive subtitle catch-up (continuous mode)",
+            )
+        )
+        self.auto_cleanup_cb.configure(
+            text=self._t.get(
+                "auto_cleanup",
+                "Auto-delete old logs (30d) & history (90d)",
             )
         )
 
