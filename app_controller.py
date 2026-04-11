@@ -47,6 +47,7 @@ class AppController:
         self._current_device: int | None = None
         self.threads: list[threading.Thread] = []
         self.translation_queue: queue.Queue[str] = queue.Queue()
+        self.error_queue: queue.Queue[str] = queue.Queue()
         self._running = False
         self.strategy: ProcessingStrategy | None = None
 
@@ -235,8 +236,12 @@ class AppController:
                 ):
                     time.sleep(0.1)
                 log(f"InputStream stopping on device {device}", level="DEBUG")
+        except OSError as e:
+            log(f"Audio device error (device {device}): {e}", level="ERROR")
+            self.error_queue.put(f"audio_device_lost:{device}")
         except Exception as e:
             log(f"InputStream error: {e}", level="ERROR")
+            self.error_queue.put(f"input_stream_error:{e}")
 
     def start(self, input_device: int | None = None):
         if self._running:
@@ -250,10 +255,15 @@ class AppController:
         reset_ring_buffer()
         clear_write_queue()
 
-        # Also clear the translation queue
+        # Also clear the translation and error queues
         while not self.translation_queue.empty():
             try:
                 self.translation_queue.get_nowait()
+            except queue.Empty:
+                break
+        while not self.error_queue.empty():
+            try:
+                self.error_queue.get_nowait()
             except queue.Empty:
                 break
 

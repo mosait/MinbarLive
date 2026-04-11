@@ -984,8 +984,8 @@ class AppGUI(tk.Tk):
         try:
             if self.subtitle_window and self.subtitle_window.winfo_exists():
                 self.subtitle_window.destroy()
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Error destroying subtitle window: {e}", level="DEBUG")
         self.subtitle_window = None
 
     def _finalize_setup(self):
@@ -1008,6 +1008,9 @@ class AppGUI(tk.Tk):
 
         # Poll for translations always (they only arrive when running)
         self.after(100, self._process_translation_queue)
+
+        # Poll for errors from controller threads
+        self.after(500, self._poll_errors)
 
     def _ensure_api_key_on_startup(self):
         ensure_api_key_on_startup(
@@ -1057,6 +1060,26 @@ class AppGUI(tk.Tk):
             log(f"Translation queue processing error: {e}", level="DEBUG")
             next_poll_ms = 100
         self.after(next_poll_ms, self._process_translation_queue)
+
+    def _poll_errors(self):
+        """Check for errors from controller threads and notify the user."""
+        try:
+            while not self.controller.error_queue.empty():
+                error = self.controller.error_queue.get_nowait()
+                if error.startswith("audio_device_lost:"):
+                    self._handle_audio_device_lost()
+                else:
+                    log(f"Controller error: {error}", level="ERROR")
+        except Exception as e:
+            log(f"Error polling error: {e}", level="DEBUG")
+        self.after(1000, self._poll_errors)
+
+    def _handle_audio_device_lost(self):
+        """Handle audio device disconnection: stop and warn user."""
+        if self._running:
+            self.on_stop()
+        self.status_label.configure(text="⚠ Audio device lost", fg="#ff6b6b")
+        log("Audio device disconnected — recording stopped", level="ERROR")
 
     def _get_translation_drain_policy(self) -> tuple[int, int]:
         """Decide how many subtitles to render now and when to poll again."""
@@ -1638,12 +1661,12 @@ class AppGUI(tk.Tk):
         # Ensure stopped
         try:
             self.controller.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Error stopping controller on close: {e}", level="DEBUG")
 
         try:
             if self.subtitle_window and self.subtitle_window.winfo_exists():
                 self.subtitle_window.destroy()
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Error destroying subtitle window on close: {e}", level="DEBUG")
         self.destroy()
