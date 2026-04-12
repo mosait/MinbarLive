@@ -20,3 +20,4 @@ build/
 internal/
 _internal/
 MinbarLive.exe
+data/embeddings/quran_embeddings.json
